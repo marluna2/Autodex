@@ -1,0 +1,25 @@
+[
+    {
+        "cusoco": 4,
+        "storage_unit": "small_shelf",
+        "container_type": "greiner_small",
+        "location": {
+            "floor": 4,
+            "x": 7,
+            "y": [
+                4,
+                5
+            ],
+            "z": 1
+        },
+        "name": "this is now changed!",
+        "description": "12vdc/24vdc",
+        "image_paths": [],
+        "contents": [
+            "festo valve",
+            "smc valve"
+        ],
+        "date_created": "2025-02-02T14:54:39.729878Z",
+        "date_changed": "2025-02-02T14:54:39.731119Z"
+    }
+]
