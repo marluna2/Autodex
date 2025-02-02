@@ -5,7 +5,7 @@ Autodex helps with storing and keeping track of large amounts of items in places
 
 It works across different storage units, ziploc bags and containers, while also minimizing the amount written information per container or bag to simply an id, called cusoco - the custom sorting code.
 
-This id is written on a sticker as both a QR-Code and a written number.
+This id is written on a sticker as both a QR-Code and a written number, and is placed on all containers.
 
 During the initial registration of a new container or bag, the entire data, including contents, name, location, and more, gets stored in a file instead of anywhere physical.
 
