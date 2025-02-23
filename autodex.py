@@ -672,4 +672,3 @@ def _post_code_fida_integrity_checks():
 
 
 _post_code_fida_integrity_checks()
-_post_code_fida_integrity_checks()
