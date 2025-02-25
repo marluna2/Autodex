@@ -55,7 +55,7 @@ soda - The sorting data. This is the saved data of a container. It is a dictiona
 ## Usage/Examples
 
 ``` python
-import autodex
+import Autodex.autodex as autodex  # Autodex reads from the actual file and checks it for any problems.
 
 autodex.add(soda={
     "cusoco": 4,
@@ -80,8 +80,14 @@ autodex.change(cusoco=4, soda={"name": "this is now changed!",
 
 print(autodex.get(search_soda={"cusoco": 4}))
 
-autodex.save()  # Actually write the data to a disk.
+autodex.save()  # Actually write the data to a disk. Anything before this only gets written to a variable and will be lost in a power outage or crash.
 ```
+
+## Setup
+
+Directly in autodex.py, change the 3 variables at the top of the code to your desire, those being _data_path, _container_types and _storage_units.
+It is advised to only ever read from these variables to ensure that the autodex data never gets corrupted in case of a power outage.
+However, changing these variables doesn't break anything, but in the case that these were set incorrectly by a different program not only reading, but also writing to them, may result in an exception, as autodex has been made to keep the autodex data as safe from any problems as possible.
 
 ## License
 
