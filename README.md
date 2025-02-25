@@ -89,6 +89,7 @@ Directly in autodex.py, change the 3 variables at the top of the code to your de
 It is advised to only ever read from these variables to ensure that the autodex data never gets corrupted in case of a power outage.
 However, changing these variables doesn't break anything, but in the case that these were set incorrectly by a different program not only reading, but also writing to them, may result in an exception, as autodex has been made to keep the autodex data as safe from any problems as possible.
 
+The autodex_data.json file contents are to be replaced with ["corruption safety override"] each time it is run until something has been written to it.
 ## License
 
 [MIT](https://choosealicense.com/licenses/mit/)
@@ -96,7 +97,7 @@ However, changing these variables doesn't break anything, but in the case that t
 
 ## Feedback
 
-If you have any questions or feedback, feel free to ask me.
+If you have any questions or feedback, feel free to send me an email or something.
 
 
 ## Links
