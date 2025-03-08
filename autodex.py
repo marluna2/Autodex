@@ -19,8 +19,8 @@ description: Simple description of where contents may stem from, or use cases: d
 
 A complete soda looks like this: {
 "cusoco": 2,
-"storage_unit": "small_shelf_even",
-"container_type": "greiner_small",
+"storage_unit": "Small shelf",
+"container_type": "Greiner small",
 "location": {
 "floor": 2,
 "x": 1,
@@ -47,10 +47,10 @@ from operator import itemgetter
 from typing import Literal
 
 _data_path = "autodex_data.json"
-_container_types = {"greiner_small": {"small_shelf": {"y": 2}},
-                    "greiner_large": {"small_shelf": {"y": 3}}}
+_container_types = {"Greiner small": {"Small shelf": {"y": 2}},
+                    "Greiner large": {"Small shelf": {"y": 3}}}
 _storage_units = {
-    "small_shelf":
+    "Small shelf":
         {
             "floor": range(1, 8),
             "x": range(1, 9),
