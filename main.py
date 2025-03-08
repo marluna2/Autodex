@@ -2,8 +2,8 @@ import autodex
 
 autodex.add(soda={
     "cusoco": 4,
-    "storage_unit": "small_shelf",
-    "container_type": "greiner_small",
+    "storage_unit": "Small shelf",
+    "container_type": "Greiner small",
     "location": {
         "floor": 4,
         "x": 7,
