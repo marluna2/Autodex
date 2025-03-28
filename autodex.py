@@ -44,19 +44,22 @@ import time
 from collections import Counter
 from datetime import datetime
 from operator import itemgetter
-from typing import Literal
+from typing import Literal, List
 
 _data_path = "autodex_data.json"
-_container_types = {"greiner_small": {"small_shelf": {"y": 2}},
-                    "greiner_large": {"small_shelf": {"y": 3}}}
+_container_types = {"A box": {"Some storage unit": {"Y": 2}},
+                    "Another box": {"Some storage unit": {"Y": 3}, "Another storage unit": {}}}
 _storage_units = {
-    "small_shelf":
+    "Some storage unit":
         {
-            "floor": range(1, 8),
-            "x": range(1, 9),
-            "y": range(1, 8),
-            "z": range(1, 3)
-        }}
+            "Floor": range(1, 8),
+            "X": range(1, 9),
+            "Y": range(1, 8),
+            "Z": range(1, 3)
+        },
+    "Another storage unit":
+        {"foo": range(1, 5)}
+}
 
 _template_soda = {
     "cusoco": "Preset",
@@ -91,7 +94,7 @@ def _pre_code_fida_integrity_checks():
         with open(_data_path, "w") as file:
             json.dump([], file, indent=4)  # clear the file of the override key the file and continue.
 
-        print(f"{5 * "#"} Corruption safety has been overridden, executing code. {5 * "#"}")
+        print(f"{5 * '#'} Corruption safety has been overridden, executing code. {5 * '#'}")
 
 
 _pre_code_fida_integrity_checks()
@@ -102,7 +105,7 @@ except json.decoder.JSONDecodeError:  # If the file can't be read, error out.
     raise Exception(f"File {_data_path} corrupted.")
 
 
-def _read() -> list[dict]:
+def _read() -> List[dict]:
     global _global_fida
 
     return _global_fida
@@ -135,7 +138,67 @@ def _find(search_soda: dict) -> list:
     return found_indexes
 
 
-def _replace(search_soda: dict, replacement_soda: dict, replace_all: bool = False) -> None:
+def get(search_soda: dict, partial_coords: bool = False, fida: List[dict] = None) -> List[dict]:
+    """
+    Get all sodas that have all their key-value-pairs match those of the search_soda.
+    :param partial_coords: If enabled, all of these: [1, 2], 4, [3], [1, 2, 3, 4, 5] would match [2, 3, 4].
+        Else only [2, 3, 4] would match [2, 3, 4].
+    :return: A list of the found sodas.
+    """
+
+    if fida is None:
+        fida_copy = _read()
+    else:
+        fida_copy = fida.copy()
+
+    search_soda_copy = search_soda.copy()
+
+    found_sodas = []
+
+    for soda in fida_copy:
+
+        correct = True
+        for item in search_soda_copy.items():
+            if item[0] == "location":
+
+                for coord in item[1].items():
+                    if partial_coords:
+                        a = (item[1][coord[0]])
+                        b = (soda["location"][coord[0]])
+
+                        if isinstance(a, int):
+                            a = [a]
+                        if isinstance(b, int):
+                            b = [b]
+
+                        # Check for intersection using sets
+                        if not (bool(set(a) & set(b))):
+                            correct = False
+
+                    else:
+                        if item[1][coord[0]] != soda["location"][coord[0]]:
+                            correct = False
+
+            elif item[1] != soda[item[0]]:
+                correct = False
+
+        if correct:
+            found_sodas.append(soda)
+
+    return found_sodas
+
+
+def exists(search_soda, partial_coords: bool = False, fida: List[dict] = None) -> bool:
+    """
+    Return True if at least one soda has all its key-value-pairs match those of the search_soda.
+    :param partial_coords: If enabled, all of these: [1, 2], 4, [3], [1, 2, 3, 4, 5] would match [2, 3, 4].
+        Else only [2, 3, 4] would match [2, 3, 4].
+    """
+
+    return bool(get(search_soda=search_soda, partial_coords=partial_coords, fida=fida))
+
+
+def _replace(search_soda: dict, replacement_soda: dict, replace_all: bool = True) -> None:
     """
     Replace one or more sodas that have all their key-value-pairs match those of the search_soda
     with the replacement_soda.
@@ -160,46 +223,6 @@ def _replace(search_soda: dict, replacement_soda: dict, replace_all: bool = Fals
     _check_fida(primary_fida)
 
     _write(primary_fida)
-
-
-def get(search_soda: dict, fida: list[dict] = None) -> list[dict]:
-    """
-    Get all sodas that have all their key-value-pairs match those of the search_soda.
-    :return: A list of the found sodas.
-    """
-
-    if fida is None:
-        fida = _read()
-
-    search_soda_copy = search_soda.copy()
-
-    found_sodas = []
-
-    for i in range(len(fida)):
-        soda = fida[i]  # Iterate through all sodas.
-
-        if all(item in soda.items() for item in search_soda_copy.items()):  # If search_soda fits into current soda,
-            found_sodas.append(soda)  # append the current soda to a list.
-
-    return found_sodas
-
-
-def exists(search_soda) -> bool:
-    """
-    Return True if at least one soda has all its key-value-pairs match those of the search_soda.
-    """
-
-    search_soda_copy = search_soda.copy()
-
-    fida = _read()
-
-    for i in range(len(fida)):
-        soda = fida[i]  # Iterate through all sodas.
-
-        if all(item in soda.items() for item in search_soda_copy.items()):  # If search_soda fits into current soda,
-            return True  # return True,
-
-    return False  # else return False.
 
 
 def check_soda(soda: dict, incomplete_soda: bool = False) -> None:
@@ -407,7 +430,7 @@ def check_soda(soda: dict, incomplete_soda: bool = False) -> None:
     # Arriving here means that no check has failed, thus the soda is valid.
 
 
-def _check_fida(fida: list[dict]):
+def _check_fida(fida: List[dict]):
     """
     Check compliance of the fida with the fida guidelines,
     and the compliance of each soda in the fida with the soda guidelines.
@@ -417,7 +440,7 @@ def _check_fida(fida: list[dict]):
 
     fida_copy = fida.copy()
 
-    def generate_combinations(fida: list[dict], target_key: str) -> list[dict]:
+    def generate_combinations(fida: List[dict], target_key: str) -> List[dict]:
         result = []
 
         for item in fida:
@@ -439,7 +462,7 @@ def _check_fida(fida: list[dict]):
 
         return result
 
-    def find_duplicates(keys: list, fida: list[dict]):
+    def find_duplicates(keys: list, fida: List[dict]):
         duplicates_info = {}
         for key in keys:
             # Every key where duplicate values aren't normal gets checked for duplicate values.
@@ -515,7 +538,7 @@ def _check_fida(fida: list[dict]):
         # Print out errors found with location only.
         for info in duplicate_locations_info:
             print(f"Multiple sodas with matching values found: "
-                  f"key: \"location\", value: {info["location"]}, cusocos: {info["cusocos"]}")
+                  f"key: \"location\", value: {info['location']}, cusocos: {info['cusocos']}")
 
         raise Exception(f"Duplicate values found.")
 
@@ -526,7 +549,7 @@ def _check_fida(fida: list[dict]):
 
         except Exception as e:
 
-            print(f"Invalid soda in fida found: cusoco: {soda["cusoco"]}, index: {i + 1}")
+            print(f"Invalid soda in fida found: cusoco: {soda['cusoco']}, index: {i + 1}")
 
             raise e
 
@@ -543,8 +566,9 @@ def add(soda: dict, on_duplicates_found: Literal["raise", "ignore", "overwrite"]
     """
 
     soda_copy = soda.copy()
-
     soda_new = _template_soda.copy()
+
+    time.sleep(0.0001)
 
     soda_new.update(soda_copy)  # Replace the values in the soda template with the actual values.
 
@@ -614,7 +638,7 @@ def change(cusoco: int, soda: dict, overwrite_date_created: bool = False) -> Non
 
     container.update(soda_copy)
 
-    _replace(search_soda={"cusoco": cusoco}, replacement_soda=container, replace_all=False)
+    _replace(search_soda={"cusoco": cusoco}, replacement_soda=container, replace_all=True)
 
 
 def remove(cusoco: int) -> None:
@@ -628,11 +652,15 @@ def remove(cusoco: int) -> None:
 
     check_soda(soda={"cusoco": cusoco}, incomplete_soda=True)
 
-    index = _find({"cusoco": cusoco})
-
     fida = _read()
 
-    del fida[index[0]]
+    indexes = []
+    for i in range(len(fida)):
+        soda = fida[i]  # Iterate through all sodas.
+        if soda["cusoco"] == cusoco:  # If search_soda fits into current soda,
+            indexes.append(i)  # append the current soda's index to a list.
+
+    del fida[indexes[0]]
 
     _check_fida(fida)
 
