@@ -57,28 +57,43 @@ soda - The sorting data. This is the saved data of a container. It is a dictiona
 ``` python
 import Autodex.autodex as autodex  # Autodex reads from the actual file and checks it for any problems.
 
-autodex.add(soda={
-    "cusoco": 4,
-    "storage_unit": "Small shelf",
-    "container_type": "Greiner small",
-    "location": {
-        "floor": 4,
-        "x": 7,
-        "y": [4, 5],
-        "z": 1
-    },
-    "name": "solenoid pneumatic valves",
-    "description": "12vdc/24vdc",
-    "image_paths": [],
-    "contents": ["festo valve", "smc valve", "steam compatible valve"]
-}, on_duplicates_found="overwrite")
+y = 1
+for i in range(1, 4):
+    autodex.add(soda={
+        "cusoco": i,
+        "storage_unit": "Some storage unit",
+        "container_type": "A box",
+        "location": {
+            "Floor": 4,
+            "X": 7,
+            "Y": [y, y + 1],
+            "Z": 2
+        },
+        "name": f"test {i}",
+        "description": "This is where all somethings are stored.",
+        "image_paths": [],
+        "contents": ["festo valve", "smc valve", "steam compatible valve"]
+    }, on_duplicates_found="ignore")
+    y += 2
 
-print(autodex.get(search_soda={"description": "12vdc/24vdc"}))
+print(autodex.exists(search_soda={"storage_unit": "Some storage unit",
+                                  "container_type": "A box",
+                                  "location": {
+                                      "Floor": 4,
+                                      "X": 7,
+                                      "Z": 2
+                                  }}, partial_coords=True))
 
-autodex.change(cusoco=4, soda={"name": "this is now changed!",
-                               "contents": ["Festo valve", "SMC valve"]})
+autodex.change(cusoco=1, soda={"name": "this is now changed!",
+                               "description": "screw this!",
+                               "contents": ["m4 screws", "m5 screws"]})
 
-print(autodex.get(search_soda={"cusoco": 4}))
+print(autodex.get(search_soda={"cusoco": 2}))
+
+print(autodex.get(search_soda={"location": {"Floor": 4,
+                                            "X": 7,
+                                            "Y": [1, 2, 3],
+                                            "Z": 2}}, partial_coords=True))
 
 autodex.save()  # Actually write the data to a disk. Anything before this only gets written to a variable and will be lost in a power outage or crash.
 ```
