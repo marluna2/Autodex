@@ -156,34 +156,37 @@ def get(search_soda: dict, partial_coords: bool = False, fida: List[dict] = None
     found_sodas = []
 
     for soda in fida_copy:
+        try:
+            correct = True
+            for item in search_soda_copy.items():
+                if item[0] == "location":
 
-        correct = True
-        for item in search_soda_copy.items():
-            if item[0] == "location":
+                    for coord in item[1].items():
+                        if partial_coords:
+                            a = (item[1][coord[0]])
+                            b = (soda["location"][coord[0]])
 
-                for coord in item[1].items():
-                    if partial_coords:
-                        a = (item[1][coord[0]])
-                        b = (soda["location"][coord[0]])
+                            if isinstance(a, int):
+                                a = [a]
+                            if isinstance(b, int):
+                                b = [b]
 
-                        if isinstance(a, int):
-                            a = [a]
-                        if isinstance(b, int):
-                            b = [b]
+                            # Check for intersection using sets
+                            if not (bool(set(a) & set(b))):
+                                correct = False
 
-                        # Check for intersection using sets
-                        if not (bool(set(a) & set(b))):
-                            correct = False
+                        else:
+                            if item[1][coord[0]] != soda["location"][coord[0]]:
+                                correct = False
 
-                    else:
-                        if item[1][coord[0]] != soda["location"][coord[0]]:
-                            correct = False
+                elif item[1] != soda[item[0]]:
+                    correct = False
 
-            elif item[1] != soda[item[0]]:
-                correct = False
+            if correct:
+                found_sodas.append(soda)
 
-        if correct:
-            found_sodas.append(soda)
+        except KeyError:
+            pass
 
     return found_sodas
 
