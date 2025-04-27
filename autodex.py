@@ -108,7 +108,7 @@ except json.decoder.JSONDecodeError:  # If the file can't be read, error out.
 def _read() -> List[dict]:
     global _global_fida
 
-    return _global_fida
+    return _global_fida.copy()
 
 
 def _write(fida) -> None:
