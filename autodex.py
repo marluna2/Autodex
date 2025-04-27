@@ -114,7 +114,7 @@ def _read() -> List[dict]:
 def _write(fida) -> None:
     global _global_fida
 
-    _global_fida = fida
+    _global_fida = fida.copy()
 
 
 def _find(search_soda: dict) -> list:
