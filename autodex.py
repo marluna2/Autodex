@@ -475,15 +475,16 @@ def _check_fida(fida: List[dict]):
     expanded_fida = generate_combinations(fida=fida_copy, target_key="location")
 
     # Check for and print individual location duplicates
-    location_duplicates_found = False
     seen_locations = []
     for soda in expanded_fida:
         location_tuple = tuple(sorted(soda["location"].items()))
         if location_tuple in seen_locations:
             cusocos = [d.get("cusoco") for d in get({"location": dict(location_tuple)}, expanded_fida)]
             print(
-                f"Multiple sodas with matching values found: key: \"location\", value: {dict(location_tuple)}, cusocos: {list(set(cusocos))}")
-            location_duplicates_found = True
+                f"Multiple sodas with matching values found: "
+                f"key: \"location\", "
+                f"value: {dict(location_tuple)}, "
+                f"cusocos: {list(set(cusocos))}")
             found_duplicate = True
         else:
             seen_locations.append(location_tuple)
@@ -495,7 +496,10 @@ def _check_fida(fida: List[dict]):
             for value in duplicate_values:
                 cusocos = [d.get("cusoco") for d in get({key: value}, fida_copy)]
                 print(
-                    f"Multiple sodas with matching values found: key: \"{key}\", value: {value}, cusocos: {list(set(cusocos))}")
+                    f"Multiple sodas with matching values found: "
+                    f"key: \"{key}\", "
+                    f"value: {value}, "
+                    f"cusocos: {list(set(cusocos))}")
 
     if found_duplicate:
         raise Exception(f"Duplicate values found.")
