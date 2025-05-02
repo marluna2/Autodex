@@ -41,7 +41,6 @@ import os.path
 import itertools
 import shutil
 import time
-from collections import Counter
 from datetime import datetime
 from operator import itemgetter
 from typing import Literal, List
@@ -442,118 +441,71 @@ def _check_fida(fida: List[dict]):
     """
 
     fida_copy = fida.copy()
+    found_duplicate = False
 
     def generate_combinations(fida: List[dict], target_key: str) -> List[dict]:
         result = []
-
         for item in fida:
-            # Extract the values from the specified target key
             target_values = item[target_key]
-
-            # Prepare the keys and values for combinations, ensuring all values are iterable
             keys = list(target_values.keys())
             values = [target_values[k] if isinstance(target_values[k], list) else [target_values[k]] for k in keys]
-
-            # Generate all combinations of values
             for combination in itertools.product(*values):
-                # Create a new dictionary for each combination, keeping a and b unchanged
                 new_item = {
                     **{k: item[k] for k in item if k not in {target_key}},
                     target_key: {keys[i]: combination[i] for i in range(len(keys))}
                 }
                 result.append(new_item)
-
         return result
 
     def find_duplicates(keys: list, fida: List[dict]):
         duplicates_info = {}
         for key in keys:
-            # Every key where duplicate values aren't normal gets checked for duplicate values.
-
             unique_values = []
             duplicate_values = []
-
             for soda in fida:
-
                 value = soda[key]
-
-                if (value in unique_values and  # If we've already seen some value for the current key before,
-                        value not in duplicate_values):  # and it hasn't already been appended
-                    # to the list of duplicate_values,
-                    duplicate_values.append(value)  # we append it to the list of duplicate_values.
-
-                elif value:  # Else, we append it to the list of unique_values, as we haven't seen it before,
-                    # unless it's empty.
+                if value in unique_values and value not in duplicate_values:
+                    duplicate_values.append(value)
+                elif value:
                     unique_values.append(value)
-
-            if duplicate_values:  # If there are duplicates,
-                duplicates_info.update({key: duplicate_values})  # append the key and it's duplicates to a dictionary.
-
+            if duplicate_values:
+                duplicates_info.update({key: duplicate_values})
         return duplicates_info
 
     expanded_fida = generate_combinations(fida=fida_copy, target_key="location")
 
-    duplicates_info = find_duplicates(keys=["location"], fida=expanded_fida)
-    duplicates_info.update(find_duplicates(keys=["cusoco", "name", "date_created", "date_changed"], fida=fida_copy))
-    # Outputs a dict containing keys that have duplicate values and a list containing the duplicate values of the keys.
-    # The output variable is duplicates_info.
+    # Check for and print individual location duplicates
+    location_duplicates_found = False
+    seen_locations = []
+    for soda in expanded_fida:
+        location_tuple = tuple(sorted(soda["location"].items()))
+        if location_tuple in seen_locations:
+            cusocos = [d.get("cusoco") for d in get({"location": dict(location_tuple)}, expanded_fida)]
+            print(
+                f"Multiple sodas with matching values found: key: \"location\", value: {dict(location_tuple)}, cusocos: {list(set(cusocos))}")
+            location_duplicates_found = True
+            found_duplicate = True
+        else:
+            seen_locations.append(location_tuple)
 
-    if duplicates_info:
-        # Handles the dependency of locations to storage units.
-        # The output variable is duplicate_locations_info.
-        duplicate_locations_info = []
+    other_duplicates_info = find_duplicates(keys=["cusoco", "name", "date_created", "date_changed"], fida=fida_copy)
+    if other_duplicates_info:
+        found_duplicate = True
+        for key, duplicate_values in other_duplicates_info.items():
+            for value in duplicate_values:
+                cusocos = [d.get("cusoco") for d in get({key: value}, fida_copy)]
+                print(
+                    f"Multiple sodas with matching values found: key: \"{key}\", value: {value}, cusocos: {list(set(cusocos))}")
 
-        if "location" in duplicates_info.keys():
-            duplicate_locations = duplicates_info["location"]
-            duplicate_locations_info = []
-
-            for location in duplicate_locations:
-
-                data = get({"location": location}, expanded_fida)
-
-                # Count occurrences of each value for the storage_unit.
-                value_counts = Counter(d["storage_unit"] for d in data)
-
-                # Filter the list to keep only dicts where the value appears more than once.
-                filtered_data = [d for d in data if value_counts[d["storage_unit"]] > 1]
-
-                if filtered_data:
-
-                    cusocos = []
-                    for soda in filtered_data:
-                        cusocos.append(soda["cusoco"])
-
-                    duplicate_locations_info.append({"cusocos": list(set(cusocos)),
-                                                     "location": location})
-
-            del duplicates_info["location"]
-
-        # Print out errors found excluding location.
-        for key in duplicates_info:
-            value = duplicates_info[key][0]
-
-            # Using list comprehension to extract values
-            cusocos = [d.get("cusoco") for d in get({key: value}, expanded_fida)]
-
-            print(f"Multiple sodas with matching values found: "
-                  f"key: \"{key}\", value: {value}, cusocos: {list(set(cusocos))}")
-
-        # Print out errors found with location only.
-        for info in duplicate_locations_info:
-            print(f"Multiple sodas with matching values found: "
-                  f"key: \"location\", value: {info['location']}, cusocos: {info['cusocos']}")
-
+    if found_duplicate:
         raise Exception(f"Duplicate values found.")
 
     for i in range(len(fida_copy)):
         soda = fida_copy[i]
         try:
             check_soda(soda)
-
         except Exception as e:
-
             print(f"Invalid soda in fida found: cusoco: {soda['cusoco']}, index: {i + 1}")
-
             raise e
 
     # Arriving here means that no check has failed, thus the soda is valid.
