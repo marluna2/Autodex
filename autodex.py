@@ -10,12 +10,12 @@ fida - The file data, is the complete data from the autodex_data.json file, cons
 
 Common arguments:
 cusoco: An individual id given to every container, irrespective of type or location.\n
-storage_unit: In which piece of furniture the container is stored, can also be "parent".\n
-location: Where in that storage unit it's located, or parent id: section 5 depth 2 x-axis 6/container #456.\n
-name: A general description of its contents: screws/small switches.\n
+storage_unit: In which piece of furniture the container is stored, can also be "Parent".\n
+location: Where in that storage unit it's located, or parent cusoco: section 5 depth 2 x-axis 6 / .\n
+name: A general description of its contents: screws / small switches.\n
 image_paths: File paths from images of its contents.\n
-contents: List of the containers contents incl. children: m4 screws/container #123.\n
-description: Simple description of where contents may stem from, or use cases: dryer/pump.\n
+contents: List of the containers contents excluding children: m4 screws, m5 screws.\n
+description: Simple description of where contents may stem from, or use cases: dryer / pump.\n
 
 A complete soda looks like this: {
 "cusoco": 2,
@@ -57,8 +57,7 @@ _storage_units = {
             "Z": range(1, 3)
         },
     "Another storage unit":
-        {"foo": range(1, 5)}
-}
+        {"foo": range(1, 5)}}
 
 _template_soda = {
     "cusoco": "Preset",
@@ -74,6 +73,8 @@ _template_soda = {
 }
 _date_format = "%Y-%m-%dT%H:%M:%S.%fZ"
 _global_fida = []
+_container_types.update({"Child": {"Parent": {}}})
+_storage_units.update({"Parent": {"Cusoco": float("inf")}})
 
 
 def _pre_code_fida_integrity_checks():
@@ -262,7 +263,7 @@ def check_soda(soda: dict, incomplete_soda: bool = False) -> None:
         storage_unit = soda_copy["storage_unit"]
         location = soda_copy["location"]
 
-        if storage_unit != "parent" or location.keys() != ["cusoco"] or not exists({"cusoco": location["cusoco"]}):
+        if storage_unit != "Parent" or location.keys() != ["Cusoco"] or not exists({"cusoco": location["Cusoco"]}):
 
             if storage_unit not in _storage_units:  # Check that the storage unit is valid.
                 raise Exception("storage_unit and location: Storage unit doesn't exist.")
@@ -299,9 +300,9 @@ def check_soda(soda: dict, incomplete_soda: bool = False) -> None:
 
         container_type = soda_copy["container_type"]
 
-        if (container_type != "bag" or
-                storage_unit != "parent" or
-                not exists({"cusoco": location["cusoco"]}) or
+        if (container_type != "Child" or
+                storage_unit != "Parent" or
+                not exists({"cusoco": location["Cusoco"]}) or
                 len(location) != 1):
 
             if container_type not in _container_types_copy:
@@ -380,18 +381,12 @@ def check_soda(soda: dict, incomplete_soda: bool = False) -> None:
             raise Exception(f"contents: The contents have to be in a list.")
 
         if contents:
-            for content in contents:
-
-                if type(content) is int:
-                    if not exists({"cusoco": content}):
-                        raise Exception(f"contents: No container #{content} exists.")
-
-                    elif not get({"cusoco": content})[0] == {"storage_unit": "parent", "location": content}:
-                        raise Exception(f"contents: The parent container #{content} "
-                                        f"isn't a child container of container #{cusoco}.")
-
-                elif type(content) is not str or not content.strip():
-                    raise Exception(f"contents: The content \"{content}\" isn't a string or #.")
+            for i in range(len(contents)):
+                content = contents[i]
+                if type(content) is not str:
+                    raise Exception(f"contents: The content {i+1} isn't a string.")
+                elif not content.strip():
+                    raise Exception(f"contents: The content number {i+1} can't be empty.")
     # </editor-fold>
     # <editor-fold desc="date_created and date_changed">
     if not incomplete_soda or "date_created" in soda_copy or "date_changed" in soda_copy:
@@ -474,20 +469,23 @@ def _check_fida(fida: List[dict]):
 
     expanded_fida = generate_combinations(fida=fida_copy, target_key="location")
 
-    # Check for and print individual location duplicates
+    error_list = []
+
+    # Check for and gather the individual location duplicates in a list
     seen_locations = []
     for soda in expanded_fida:
-        location_tuple = tuple(sorted(soda["location"].items()))
-        if location_tuple in seen_locations:
-            cusocos = [d.get("cusoco") for d in get({"location": dict(location_tuple)}, expanded_fida)]
-            print(
-                f"Multiple sodas with matching values found: "
-                f"key: \"location\", "
-                f"value: {dict(location_tuple)}, "
-                f"cusocos: {list(set(cusocos))}")
-            found_duplicate = True
-        else:
-            seen_locations.append(location_tuple)
+        if list(soda["location"].keys()) != ["Cusoco"]:
+            location_tuple = tuple(sorted(soda["location"].items()))
+            if location_tuple in seen_locations:
+                cusocos = [d.get("cusoco") for d in get({"location": dict(location_tuple)}, expanded_fida)]
+                error_list.append(
+                    f"Multiple sodas with matching values found: "
+                    f"key: \"location\", "
+                    f"value: {dict(location_tuple)}, "
+                    f"cusocos: {list(set(cusocos))}")
+                found_duplicate = True
+            else:
+                seen_locations.append(location_tuple)
 
     other_duplicates_info = find_duplicates(keys=["cusoco", "name", "date_created", "date_changed"], fida=fida_copy)
     if other_duplicates_info:
@@ -495,22 +493,25 @@ def _check_fida(fida: List[dict]):
         for key, duplicate_values in other_duplicates_info.items():
             for value in duplicate_values:
                 cusocos = [d.get("cusoco") for d in get({key: value}, fida_copy)]
-                print(
+                error_list.append(
                     f"Multiple sodas with matching values found: "
                     f"key: \"{key}\", "
                     f"value: {value}, "
                     f"cusocos: {list(set(cusocos))}")
 
     if found_duplicate:
-        raise Exception(f"Duplicate values found.")
+        error_text = "Duplicate values found:"
+        for error in error_list:
+            error_text += f"\n{error}"
+        raise Exception(error_text)
 
     for i in range(len(fida_copy)):
         soda = fida_copy[i]
         try:
             check_soda(soda)
         except Exception as e:
-            print(f"Invalid soda in fida found: cusoco: {soda['cusoco']}, index: {i + 1}")
-            raise e
+            raise Exception(f"Invalid soda in fida found: cusoco: {soda['cusoco']}, index: {i + 1}\n"
+                            f"{e}")
 
     # Arriving here means that no check has failed, thus the soda is valid.
 

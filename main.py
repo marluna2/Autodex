@@ -19,6 +19,32 @@ for i in range(1, 4):
     }, on_duplicates_found="ignore")
     y += 2
 
+autodex.add(soda={
+    "cusoco": 5,
+    "storage_unit": "Parent",
+    "container_type": "Child",
+    "location": {
+        "Cusoco": 2
+    },
+    "name": f"child 1",
+    "description": "A child of #2.",
+    "image_paths": [],
+    "contents": []
+}, on_duplicates_found="ignore")
+
+autodex.add(soda={
+    "cusoco": 6,
+    "storage_unit": "Parent",
+    "container_type": "Child",
+    "location": {
+        "Cusoco": 2
+    },
+    "name": f"child 2",
+    "description": "Another child, also of #2.",
+    "image_paths": [],
+    "contents": []
+}, on_duplicates_found="ignore")
+
 print(autodex.exists(search_soda={"storage_unit": "Some storage unit",
                                   "container_type": "A box",
                                   "location": {

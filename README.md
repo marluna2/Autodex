@@ -16,7 +16,7 @@ and to know about all things you own.
 
 ## Important terms
 
-storage unit - This is a piece of furniture like a shelf. Different storage units can have different amounts of space in different axies specified for containers. 
+storage unit - This is a piece of furniture like a shelf. Different storage units can have different amounts of space in different axes specified for containers. 
 
 container - This means either a box or a child of a box, being a ziploc bag.
 
@@ -33,17 +33,17 @@ soda - The sorting data. This is the saved data of a container. It is a dictiona
     "cusoco": 4,  # The index of the container.
     "storage_unit": "Small shelf",  # The piece of furniture it's stored in.
     "container_type": "9L transparent box",  # The container type.
-    "location": {  # Where the container is located inside of the storage unit.
+    "location": {  # Where the container is located inside the storage unit.
         "floor": 4,  # Different storage units accept different container types,
         "x": 7,  # some locations can be an integer,
         "y": [4, 5, 6]  # others can be a range of values, indicating that the container
                         # takes up the space of 3 y-units.
         },
-    "name": "solenoid pneumatic valves",  # Something unique about it's contents.
+    "name": "solenoid pneumatic valves",  # Something unique about its contents.
     "description": "12vdc/24vdc", 
     "image_paths": ["45125.png", "41452.png"],
-    "contents": ["Festo valve", "SMC valve", "Steam compatible valve", 283],
-                                # Can also include cusocos of other containes
+    "contents": ["Festo valve", "SMC valve", "Steam compatible valve"],
+                                # Does not include cusocos of child containers.
     "date_created": "2025-01-16T23:00:12.978108Z",  # These two dates are not needed 
     "date_changed": "2025-01-16T23:00:40.654869Z"   # when adding a container.
 }
