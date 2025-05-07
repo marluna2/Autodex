@@ -274,7 +274,7 @@ def check_soda(soda: dict, incomplete_soda: bool = False) -> None:
     _container_types_copy = _container_types.copy()
 
     if incomplete_soda and not len(soda_copy):
-        raise Exception("Soda is empty.")
+        raise Exception("check_soda: Soda is empty.")
 
     if not incomplete_soda:  # Check if all required keys are present.
         for key in _template_soda:
@@ -288,7 +288,7 @@ def check_soda(soda: dict, incomplete_soda: bool = False) -> None:
         cusoco = soda_copy["cusoco"]
 
         if type(cusoco) is not int or cusoco < 1:
-            raise Exception(f"cusoco: #{cusoco} isn't an integer.")
+            raise Exception(f"cusoco: {cusoco} isn't an integer.")
     # </editor-fold>
     # <editor-fold desc="storage_unit and location">
     if not incomplete_soda or "storage_unit" in soda_copy or "location" in soda_copy:
@@ -305,7 +305,7 @@ def check_soda(soda: dict, incomplete_soda: bool = False) -> None:
 
             if len(locations_required) != len(
                     location):  # Check that the amount of arguments given and required are the same.
-                raise Exception("storage_unit and location: Invalid amount of arguments.")
+                raise Exception("storage_unit and location: Invalid amount of locations.")
 
             for key in location:  # Iterate through each key.
 
@@ -576,7 +576,7 @@ def add(soda: dict, on_duplicates_found: Literal["raise", "ignore", "overwrite"]
 
     if exists({"cusoco": cusoco}):  # What to do if a container with the same cusoco already exists.
         if on_duplicates_found == "raise":
-            raise Exception(f"The container #{cusoco} already exists.")
+            raise Exception(f"cusoco: The container {cusoco} already exists.")
 
         elif on_duplicates_found == "ignore":
             return
