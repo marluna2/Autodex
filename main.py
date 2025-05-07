@@ -20,7 +20,7 @@ for i in range(1, 4):
     y += 2
 
 autodex.add(soda={
-    "cusoco": 5,
+    "cusoco": 4,
     "storage_unit": "Parent",
     "container_type": "Child",
     "location": {
@@ -33,7 +33,7 @@ autodex.add(soda={
 }, on_duplicates_found="overwrite")
 
 autodex.add(soda={
-    "cusoco": 6,
+    "cusoco": 5,
     "storage_unit": "Parent",
     "container_type": "Child",
     "location": {
@@ -45,29 +45,33 @@ autodex.add(soda={
     "contents": []
 }, on_duplicates_found="overwrite")
 
-print(autodex.exists(search_soda={"storage_unit": "Some storage unit",
-                                  "container_type": "A box",
-                                  "location": {
-                                      "Floor": 4,
-                                      "X": 7,
-                                      "Z": 2
-                                  }}, partial_coords=True))
+print(1, autodex.exists(search_soda={"storage_unit": "Some storage unit",
+                                     "container_type": "A box",
+                                     "location": {
+                                         "Floor": 4,
+                                         "X": 7,
+                                         "Z": 2
+                                     }}, partial_coords=True))
 
 autodex.change(cusoco=1, soda={"name": "this is now changed!",
                                "description": "screw this!",
                                "contents": ["m4 screws", "m5 screws"]})
 
-print(autodex.get(search_soda={"cusoco": 2}))
+print(2, autodex.get(search_soda={"cusoco": 2}))
 
-print(autodex.get(search_soda={"location": {"Floor": 4,
-                                            "X": 7,
-                                            "Y": [1, 2, 3],
-                                            "Z": 2}}, partial_coords=True))
+print(3, autodex.get(search_soda={"description": "this"}, partial_description=True))
 
-print(autodex.get(search_soda={"contents": ['m4 screws']}, partial_contents=True))
+print(4, autodex.get(search_soda={"contents": "screw"}, partial_contents=True))
 
-print(autodex.get(search_soda={"description": "this"}, partial_description=True))
+print(5, autodex.get(search_soda={"location": {"Floor": 4,
+                                               "X": 7,
+                                               "Y": [1, 2, 3],
+                                               "Z": 2}}, partial_coords=True))
 
-autodex.remove(cusoco=1)
+print(6, autodex.get(search_soda={"contents": ['m4 screws']}, partial_contents=True))
+
+print(7, autodex.get(search_soda={"description": "this"}, partial_description=True))
+
+autodex.remove(cusoco=2)
 
 autodex.save()  # Actually write the data to a disk.

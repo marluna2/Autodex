@@ -220,14 +220,18 @@ def get(search_soda: dict,
     return found_sodas
 
 
-def exists(search_soda, partial_coords: bool = False, fida: List[dict] = None) -> bool:
+def exists(search_soda: dict,
+           partial_coords: bool = False,
+           partial_contents: bool = False,
+           partial_image_paths: bool = False,
+           partial_description: bool = False, fida: List[dict] = None) -> bool:
     """
     Return True if at least one soda has all its key-value-pairs match those of the search_soda.
     :param partial_coords: If enabled, all of these: [1, 2], 4, [3], [1, 2, 3, 4, 5] would match [2, 3, 4].
         Else only [2, 3, 4] would match [2, 3, 4].
     """
 
-    return bool(get(search_soda=search_soda, partial_coords=partial_coords, fida=fida))
+    return bool(get(search_soda, partial_coords, partial_contents, partial_image_paths, partial_description, fida))
 
 
 def _replace(search_soda: dict, replacement_soda: dict, replace_all: bool = True) -> None:
@@ -636,16 +640,29 @@ def remove(cusoco: int) -> None:
     :param cusoco: Cusoco of the container or containers to remove.
     """
 
-    if not exists(search_soda={"cusoco": cusoco}):
+    if not exists({"cusoco": cusoco}) and not exists(
+            {"storage_unit": "Parent", "container_type": "Child", "location": {"Cusoco": cusoco}}):
         raise Exception("No containers found to remove.")
 
     check_soda(soda={"cusoco": cusoco}, incomplete_soda=True)
 
-    indexes = _find({"cusoco": cusoco})
+    indexes = []
+
+    for i in get({"cusoco": cusoco}):
+        for x in _find(i):
+            indexes.append(x)
+
+    for i in get({"storage_unit": "Parent", "container_type": "Child", "location": {"Cusoco": cusoco}}):
+        for x in _find(i):
+            indexes.append(x)
 
     fida = _read()
+    print(indexes)
+    for i in indexes:
+        fida[i] = None
 
-    del fida[indexes[0]]
+    for i in range(fida.count(None)):
+        fida.remove(None)
 
     _check_fida(fida)
 
@@ -657,12 +674,14 @@ def save():
     Actually save the file to the disc.
     """
 
+    global_fida_copy = _read()
+
     temp_filename = _data_path + ".tmp"
 
-    sorted(_global_fida, key=itemgetter("cusoco"))
+    global_fida_copy = sorted(global_fida_copy, key=itemgetter("cusoco"))
 
     with open(temp_filename, "w") as file:
-        json.dump(_global_fida, file, indent=4)
+        json.dump(global_fida_copy, file, indent=4)
 
     try:
         with open(temp_filename, "r") as file:
