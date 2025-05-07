@@ -51,7 +51,8 @@ soda - The sorting data. This is the saved data of a container. It is a dictiona
 
 ###
 
-![App Screenshot](https://i.ibb.co/Lz4DKvbr/Page1-2.png)
+![image](https://github.com/user-attachments/assets/dd3e1f34-a876-424c-8d39-0d33091552ba)
+
 ## Usage/Examples
 
 ``` python
