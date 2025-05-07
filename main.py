@@ -68,4 +68,6 @@ print(autodex.get(search_soda={"contents": ['m4 screws']}, partial_contents=True
 
 print(autodex.get(search_soda={"description": "this"}, partial_description=True))
 
+autodex.remove(cusoco=1)
+
 autodex.save()  # Actually write the data to a disk.

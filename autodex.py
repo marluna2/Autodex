@@ -59,23 +59,6 @@ _storage_units = {
     "Another storage unit":
         {"foo": range(1, 5)}}
 
-_template_soda = {
-    "cusoco": "Preset",
-    "storage_unit": "Preset",
-    "container_type": "Preset",
-    "location": "Preset",
-    "name": None,
-    "description": None,
-    "image_paths": "Preset",
-    "contents": "Preset",
-    "date_created": "Preset",
-    "date_changed": "Preset"
-}
-_date_format = "%Y-%m-%dT%H:%M:%S.%fZ"
-_global_fida = []
-_container_types.update({"Child": {"Parent": {}}})
-_storage_units.update({"Parent": {"Cusoco": float("inf")}})
-
 
 def _pre_code_fida_integrity_checks():
     if not _data_path.endswith(".json"):
@@ -97,6 +80,22 @@ def _pre_code_fida_integrity_checks():
         print(f"{5 * '#'} Corruption safety has been overridden, executing code. {5 * '#'}")
 
 
+_template_soda = {
+    "cusoco": "Preset",
+    "storage_unit": "Preset",
+    "container_type": "Preset",
+    "location": "Preset",
+    "name": None,
+    "description": None,
+    "image_paths": "Preset",
+    "contents": "Preset",
+    "date_created": "Preset",
+    "date_changed": "Preset"
+}
+_date_format = "%Y-%m-%dT%H:%M:%S.%fZ"
+_global_fida = []
+_container_types.update({"Child": {"Parent": {}}})
+_storage_units.update({"Parent": {"Cusoco": float("inf")}})
 _pre_code_fida_integrity_checks()
 try:
     with open(_data_path, "r") as _fida:
@@ -537,11 +536,11 @@ def _check_fida(fida: List[dict]):
 
     for i in range(len(fida_copy)):
         soda = fida_copy[i]
-        #try:
-        check_soda(soda)
-        #except Exception as e:
-        #    raise Exception(f"Invalid soda in fida found: cusoco: {soda['cusoco']}, index: {i + 1}\n"
-        #                    f"{e}")
+        try:
+            check_soda(soda)
+        except Exception as e:
+            raise Exception(f"Invalid soda in fida found: cusoco: {soda['cusoco']}, index: {i + 1}\n"
+                            f"{e}")
 
     # Arriving here means that no check has failed, thus the soda is valid.
 
