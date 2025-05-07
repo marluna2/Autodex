@@ -16,7 +16,7 @@ for i in range(1, 4):
         "description": "This is where all somethings are stored.",
         "image_paths": [],
         "contents": ["festo valve", "smc valve", "steam compatible valve"]
-    }, on_duplicates_found="ignore")
+    }, on_duplicates_found="overwrite")
     y += 2
 
 autodex.add(soda={
@@ -30,7 +30,7 @@ autodex.add(soda={
     "description": "A child of #2.",
     "image_paths": [],
     "contents": []
-}, on_duplicates_found="ignore")
+}, on_duplicates_found="overwrite")
 
 autodex.add(soda={
     "cusoco": 6,
@@ -43,7 +43,7 @@ autodex.add(soda={
     "description": "Another child, also of #2.",
     "image_paths": [],
     "contents": []
-}, on_duplicates_found="ignore")
+}, on_duplicates_found="overwrite")
 
 print(autodex.exists(search_soda={"storage_unit": "Some storage unit",
                                   "container_type": "A box",
@@ -63,5 +63,9 @@ print(autodex.get(search_soda={"location": {"Floor": 4,
                                             "X": 7,
                                             "Y": [1, 2, 3],
                                             "Z": 2}}, partial_coords=True))
+
+print(autodex.get(search_soda={"contents": ['m4 screws']}, partial_contents=True))
+
+print(autodex.get(search_soda={"description": "this"}, partial_description=True))
 
 autodex.save()  # Actually write the data to a disk.

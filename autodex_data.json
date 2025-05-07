@@ -1,1 +1,101 @@
-["corruption safety override"]
+[
+    {
+        "cusoco": 1,
+        "storage_unit": "Some storage unit",
+        "container_type": "A box",
+        "location": {
+            "Floor": 4,
+            "X": 7,
+            "Y": [
+                1,
+                2
+            ],
+            "Z": 2
+        },
+        "name": "this is now changed!",
+        "description": "screw this!",
+        "image_paths": [],
+        "contents": [
+            "m4 screws",
+            "m5 screws"
+        ],
+        "date_created": "2025-05-07T17:58:54.388742Z",
+        "date_changed": "2025-05-07T17:58:54.532743Z"
+    },
+    {
+        "cusoco": 2,
+        "storage_unit": "Some storage unit",
+        "container_type": "A box",
+        "location": {
+            "Floor": 4,
+            "X": 7,
+            "Y": [
+                3,
+                4
+            ],
+            "Z": 2
+        },
+        "name": "test 2",
+        "description": "This is where all somethings are stored.",
+        "image_paths": [],
+        "contents": [
+            "festo valve",
+            "smc valve",
+            "steam compatible valve"
+        ],
+        "date_created": "2025-05-07T17:58:54.420743Z",
+        "date_changed": null
+    },
+    {
+        "cusoco": 3,
+        "storage_unit": "Some storage unit",
+        "container_type": "A box",
+        "location": {
+            "Floor": 4,
+            "X": 7,
+            "Y": [
+                5,
+                6
+            ],
+            "Z": 2
+        },
+        "name": "test 3",
+        "description": "This is where all somethings are stored.",
+        "image_paths": [],
+        "contents": [
+            "festo valve",
+            "smc valve",
+            "steam compatible valve"
+        ],
+        "date_created": "2025-05-07T17:58:54.452742Z",
+        "date_changed": null
+    },
+    {
+        "cusoco": 5,
+        "storage_unit": "Parent",
+        "container_type": "Child",
+        "location": {
+            "Cusoco": 2
+        },
+        "name": "child 1",
+        "description": "A child of #2.",
+        "image_paths": [],
+        "contents": [],
+        "date_created": "2025-05-07T17:58:54.484737Z",
+        "date_changed": null
+    },
+    {
+        "cusoco": 6,
+        "storage_unit": "Parent",
+        "container_type": "Child",
+        "location": {
+            "Cusoco": 2
+        },
+        "name": "child 2",
+        "description": "Another child, also of #2.",
+        "image_paths": [],
+        "contents": [],
+        "date_created": "2025-05-07T17:58:54.516742Z",
+        "date_changed": null
+    }
+]

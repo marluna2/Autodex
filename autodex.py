@@ -138,11 +138,18 @@ def _find(search_soda: dict) -> list:
     return found_indexes
 
 
-def get(search_soda: dict, partial_coords: bool = False, fida: List[dict] = None) -> List[dict]:
+def get(search_soda: dict,
+        partial_coords: bool = False,
+        partial_contents: bool = False,
+        partial_image_paths: bool = False,
+        partial_description: bool = False, fida: List[dict] = None) -> List[dict]:
     """
     Get all sodas that have all their key-value-pairs match those of the search_soda.
     :param partial_coords: If enabled, all of these: [1, 2], 4, [3], [1, 2, 3, 4, 5] would match [2, 3, 4].
         Else only [2, 3, 4] would match [2, 3, 4].
+    :param partial_contents: Same as with partial_coords.
+    :param partial_image_paths: Same as with partial_coords.
+    :param partial_description: Same as with partial_coords.
     :return: A list of the found sodas.
     """
 
@@ -158,12 +165,11 @@ def get(search_soda: dict, partial_coords: bool = False, fida: List[dict] = None
     for soda in fida_copy:
         try:
             correct = True
-            for item in search_soda_copy.items():
-                if item[0] == "location":
-
-                    for coord in item[1].items():
+            for search_item in search_soda_copy.items():
+                if search_item[0] == "location":
+                    for coord in search_item[1].items():
                         if partial_coords:
-                            a = (item[1][coord[0]])
+                            a = (search_item[1][coord[0]])
                             b = (soda["location"][coord[0]])
 
                             if isinstance(a, int):
@@ -176,10 +182,34 @@ def get(search_soda: dict, partial_coords: bool = False, fida: List[dict] = None
                                 correct = False
 
                         else:
-                            if item[1][coord[0]] != soda["location"][coord[0]]:
+                            if search_item[1][coord[0]] != soda["location"][coord[0]]:
                                 correct = False
 
-                elif item[1] != soda[item[0]]:
+                elif search_item[0] in "contents":
+                    if partial_contents:
+                        if not set(search_item[1]).issubset(soda["contents"]):
+                            correct = False
+                    else:
+                        if search_item[1] != soda["contents"]:
+                            correct = False
+
+                elif search_item[0] == "image_paths":
+                    if partial_image_paths:
+                        if not set(search_item[1]).issubset(soda["image_paths"]):
+                            correct = False
+                    else:
+                        if search_item[1] != soda["image_paths"]:
+                            correct = False
+
+                elif search_item[0] == "description":
+                    if partial_description:
+                        if search_item[1] not in soda[search_item[0]]:
+                            correct = False
+                    else:
+                        if search_item[1] != soda["description"]:
+                            correct = False
+
+                elif search_item[1] != soda[search_item[0]]:
                     correct = False
 
             if correct:
@@ -384,9 +414,9 @@ def check_soda(soda: dict, incomplete_soda: bool = False) -> None:
             for i in range(len(contents)):
                 content = contents[i]
                 if type(content) is not str:
-                    raise Exception(f"contents: The content {i+1} isn't a string.")
+                    raise Exception(f"contents: The content {i + 1} isn't a string.")
                 elif not content.strip():
-                    raise Exception(f"contents: The content number {i+1} can't be empty.")
+                    raise Exception(f"contents: The content number {i + 1} can't be empty.")
     # </editor-fold>
     # <editor-fold desc="date_created and date_changed">
     if not incomplete_soda or "date_created" in soda_copy or "date_changed" in soda_copy:
@@ -507,11 +537,11 @@ def _check_fida(fida: List[dict]):
 
     for i in range(len(fida_copy)):
         soda = fida_copy[i]
-        try:
-            check_soda(soda)
-        except Exception as e:
-            raise Exception(f"Invalid soda in fida found: cusoco: {soda['cusoco']}, index: {i + 1}\n"
-                            f"{e}")
+        #try:
+        check_soda(soda)
+        #except Exception as e:
+        #    raise Exception(f"Invalid soda in fida found: cusoco: {soda['cusoco']}, index: {i + 1}\n"
+        #                    f"{e}")
 
     # Arriving here means that no check has failed, thus the soda is valid.
 
@@ -603,8 +633,8 @@ def change(cusoco: int, soda: dict, overwrite_date_created: bool = False) -> Non
 
 def remove(cusoco: int) -> None:
     """
-    Remove a container.
-    :param cusoco: Cusoco of the container to remove.
+    Remove all containers with a certain cusoco, along with their children.
+    :param cusoco: Cusoco of the container or containers to remove.
     """
 
     if not exists(search_soda={"cusoco": cusoco}):
@@ -612,13 +642,9 @@ def remove(cusoco: int) -> None:
 
     check_soda(soda={"cusoco": cusoco}, incomplete_soda=True)
 
-    fida = _read()
+    indexes = _find({"cusoco": cusoco})
 
-    indexes = []
-    for i in range(len(fida)):
-        soda = fida[i]  # Iterate through all sodas.
-        if soda["cusoco"] == cusoco:  # If search_soda fits into current soda,
-            indexes.append(i)  # append the current soda's index to a list.
+    fida = _read()
 
     del fida[indexes[0]]
 
