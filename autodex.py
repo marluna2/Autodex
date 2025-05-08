@@ -46,18 +46,20 @@ from operator import itemgetter
 from typing import Literal, List
 
 _data_path = "autodex_data.json"
-_container_types = {"A box": {"Some storage unit": {"Y": 2}},
-                    "Another box": {"Some storage unit": {"Y": 3}, "Another storage unit": {}}}
+_container_types = {"Greiner Small": {"Small shelf": {"Y": 2}},
+                    "Greiner large": {"Small shelf": {"Y": 3}, "Large shelf": {}},
+                    "bag": {"parent": {}}}
 _storage_units = {
-    "Some storage unit":
+    "Small shelf":
         {
             "Floor": range(1, 8),
             "X": range(1, 9),
             "Y": range(1, 8),
             "Z": range(1, 3)
         },
-    "Another storage unit":
-        {"foo": range(1, 5)}}
+    "Large shelf":
+        {"foo": range(1, 5)}
+}
 
 
 def _pre_code_fida_integrity_checks():
@@ -290,22 +292,28 @@ def check_soda(soda: dict, incomplete_soda: bool = False) -> None:
         if type(cusoco) is not int or cusoco < 1:
             raise Exception(f"cusoco: {cusoco} isn't an integer.")
     # </editor-fold>
-    # <editor-fold desc="storage_unit and location">
-    if not incomplete_soda or "storage_unit" in soda_copy or "location" in soda_copy:
+    # <editor-fold desc="storage_unit, container_type and location">
+    if not incomplete_soda or "storage_unit" in soda_copy or "container_type" in soda_copy or "location" in soda_copy:
 
         storage_unit = soda_copy["storage_unit"]
         location = soda_copy["location"]
+        container_type = soda_copy["container_type"]
 
-        if storage_unit != "Parent" or location.keys() != ["Cusoco"] or not exists({"cusoco": location["Cusoco"]}):
+        if not storage_unit:
+            raise Exception(f"storage_unit: The storage unit can't be empty.")
+        elif not container_type:
+            raise Exception(f"container_type: The container type can't be empty.")
+
+        if storage_unit != "Parent" or list(location.keys()) != ["Cusoco"]:
 
             if storage_unit not in _storage_units:  # Check that the storage unit is valid.
-                raise Exception("storage_unit and location: Storage unit doesn't exist.")
+                raise Exception("storage_unit: Storage unit doesn't exist.")
 
             locations_required = _storage_units[storage_unit]  # Get dict with valid value ranges for the storage unit.
 
             if len(locations_required) != len(
                     location):  # Check that the amount of arguments given and required are the same.
-                raise Exception("storage_unit and location: Invalid amount of locations.")
+                raise Exception("location: Invalid amount of locations.")
 
             for key in location:  # Iterate through each key.
 
@@ -321,22 +329,11 @@ def check_soda(soda: dict, incomplete_soda: bool = False) -> None:
                             pass  # as that can't be checked using range().
 
                         elif single_value not in locations_required[key]:  # Check that it's inside its allowed range.
-                            raise Exception(f"storage_unit and location: {key}: {single_value} "
+                            raise Exception(f"location: {key}: {single_value} "
                                             f"doesn't meet its requirements.")
 
                     else:
-                        raise Exception(f"storage_unit and location: The key {key} isn't in the requirements.")
-    # </editor-fold>
-    # <editor-fold desc="container_type">
-    if (not incomplete_soda or
-            "container_type" in soda_copy):
-
-        container_type = soda_copy["container_type"]
-
-        if (container_type != "Child" or
-                storage_unit != "Parent" or
-                not exists({"cusoco": location["Cusoco"]}) or
-                len(location) != 1):
+                        raise Exception(f"location: The key {key} isn't in the requirements.")
 
             if container_type not in _container_types_copy:
                 raise Exception(f"container_type: The container type \"{container_type}\" doesn't exist.")
@@ -344,6 +341,12 @@ def check_soda(soda: dict, incomplete_soda: bool = False) -> None:
             elif storage_unit not in list(_container_types_copy[container_type].keys()):
                 raise Exception(f"container_type: Storage unit \"{storage_unit}\" "
                                 f"doesn't allow the container type \"{container_type}\".")
+
+        elif location["Cusoco"] == cusoco:
+            raise Exception(f"location: Parent cusoco can't be it's own cusoco.")
+
+        elif not exists({"cusoco": location["Cusoco"]}):
+            raise Exception(f"location: Parent cusoco {location['Cusoco']} doesn't exist.")
     # </editor-fold>
     # <editor-fold desc="location_size_ranges">
     if (not incomplete_soda or
@@ -546,6 +549,67 @@ def _check_fida(fida: List[dict]):
             raise Exception(f"Invalid soda in fida found: cusoco: {soda['cusoco']}, index: {i + 1}\n"
                             f"{e}")
 
+    def find_referential_loops_containers(list_of_dicts):
+        """
+        Detects if there are any self-referential container dicts or loops of
+        references within a list of these dictionaries.
+
+        Args:
+            list_of_dicts: A list of container dictionaries, where each dictionary
+                           has a 'cusoco' (id) and potentially a 'location' that
+                           can reference another container's 'cusoco' if
+                           'storage_unit' is "Parent" and 'container_type' is "Child".
+
+        Returns:
+            A list of tuples, where each tuple represents a detected loop of 'cusoco'
+            values. Returns an empty list if no loops are found.
+        """
+        id_to_dict = {d['cusoco']: d for d in list_of_dicts}
+        num_dicts = len(list_of_dicts)
+        visited = [False] * num_dicts
+        recursion_stack = [False] * num_dicts
+        loops = set()
+
+        def _detect_cycle(index, path):
+            visited[index] = True
+            recursion_stack[index] = True
+            current_dict = list_of_dicts[index]
+            current_id = current_dict['cusoco']
+            location = current_dict.get('location')
+
+            if current_dict.get('storage_unit') == "Parent" and current_dict.get(
+                    'container_type') == "Child" and isinstance(location, dict) and "Cusoco" in location:
+                referenced_cusoco = location["Cusoco"]
+                if referenced_cusoco in id_to_dict:
+                    neighbor_dict = id_to_dict[referenced_cusoco]
+                    neighbor_index = -1
+                    try:
+                        neighbor_index = list_of_dicts.index(neighbor_dict)
+                    except ValueError:
+                        # Referenced cusoco not found in the list, not a loop
+                        pass
+
+                    if neighbor_index != -1:
+                        if recursion_stack[neighbor_index]:
+                            # Cycle detected
+                            cycle_start_index = path.index(referenced_cusoco)
+                            loop = tuple(path[cycle_start_index:] + [referenced_cusoco])
+                            loops.add(tuple(sorted(loop)))
+                        elif not visited[neighbor_index]:
+                            _detect_cycle(neighbor_index, path + [referenced_cusoco])
+
+            recursion_stack[index] = False
+
+        for i in range(num_dicts):
+            if not visited[i]:
+                _detect_cycle(i, [list_of_dicts[i]['cusoco']])
+
+        return [list(loop) for loop in loops]
+
+    recursions = find_referential_loops_containers(_read())
+    if recursions:
+        raise Exception(f"Looping references of child and parent containers found: {recursions}")
+
     # Arriving here means that no check has failed, thus the soda is valid.
 
 
@@ -691,8 +755,13 @@ def save():
         for soda in fida:
             check_soda(soda)
 
-    except:
-        raise Exception(f"Temporary file corrupted, leaving {_data_path} unchanged.")
+    except Exception as e:
+        print(e)
+        os.remove(temp_filename)
+        global _global_fida
+        with open(_data_path, "r") as _fida:
+            _global_fida = json.load(_fida)
+        raise Exception(f"Temporary file corrupted, leaving {_data_path} unchanged, deleting temporary file.")
 
     shutil.move(temp_filename, _data_path)
 
