@@ -1,1 +1,13 @@
-["corruption safety override"]
+[{
+  "Autodex version": "V2",
+  "Last saved": "",
+  "Storage units": {
+  "Greiner Small": {
+    "Small shelf": {"Y": 2}},
+    "Greiner large": {"Small shelf": {"Y": 3}, "Large shelf": {}},
+    "bag": {"parent": {}}},
+  "Container types": {
+    "Small shelf": {"Floor": [1, 8], "X": [1, 9], "Y": [1, 8], "Z": [1, 3]},
+    "Large shelf": {"foo": [1, 5]}
+}},
+  {}]
