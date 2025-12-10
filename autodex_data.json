@@ -1,13 +1,29 @@
 [{
-  "Autodex version": "V2",
+  "Autodex version": "V2 (1.12.2025)",
   "Last saved": "",
+
+  "Date format": "%Y-%m-%dT%H:%M:%S.%fZ",
+
   "Storage units": {
-  "Greiner Small": {
-    "Small shelf": {"Y": 2}},
-    "Greiner large": {"Small shelf": {"Y": 3}, "Large shelf": {}},
-    "bag": {"parent": {}}},
+    "Small shelf": {"Floor": [1, 7], "X": [1, 8], "Y": [1, 7], "Z": [1, 5]},
+    "Large shelf": {"foo": [1, 4]}},
+
   "Container types": {
-    "Small shelf": {"Floor": [1, 8], "X": [1, 9], "Y": [1, 8], "Z": [1, 3]},
-    "Large shelf": {"foo": [1, 5]}
-}},
-  {}]
+    "Greiner small": {"Small shelf": {"Y": 2}},
+    "Greiner large": {"Small shelf": {"Y": 3, "Z": 2}, "Large shelf": {}}}
+  },
+{
+    "Cusoco": 1,
+    "Storage unit": "Small shelf",
+    "Container type": "Greiner large",
+    "Location": {"Floor": 2, "X": 1, "Y": 4, "Z": 3},
+    "Name": "Test box",
+    "Description": "Hello world!",
+    "Contents": ["Item a", "Item b", "Item c"],
+    "Tags": ["Valve", "Pneumatic", "Electromagnetic", "Electric", "Electromechanical", "Mechanical"],
+    "Numeric attributes": {"Pressure": {"bar": [6.3, 8]}, "Voltage": {"Vdc": [6, 12], "Vac": [24]}},
+    "Categorical attributes": {"Manufacturer": ["Rexroth", "SMC", "Festo"], "Valve type": ["3/2 Way", "5/2 Way"]},
+    "Image paths": ["img1.png", "img2.png"],
+    "F3D folder path": "3D_Images_12345"
+}
+]
