@@ -1,77 +1,41 @@
-import autodex
+import autodex_V2
 
-y = 1
-for i in range(1, 4):
-    autodex.add(soda={
-        "cusoco": i,
-        "storage_unit": "Some storage unit",
-        "container_type": "A box",
-        "location": {
-            "Floor": 4,
-            "X": 7,
-            "Y": [y, y + 1],
-            "Z": 2
-        },
-        "name": f"test {i}",
-        "description": "This is where all somethings are stored.",
-        "image_paths": [],
-        "contents": ["festo valve", "smc valve", "steam compatible valve"]
-    }, on_duplicates_found="overwrite")
-    y += 2
+soda = {
+    "Cusoco": 14,
+    "Storage unit": "Small wood shelf",
+    "Container type": "Blue box S",
+    "Location": {"Floor": 2, "X": 4, "Depth": 1},
+    "Name": "Solenoid air valves",
+    "Description": "Some of the seals might need to be replaced",
+    "Contents": ["CPE18-M1H-5L-1/4", "OT-SMC064843"],
+    "Tags": ["Valve", "Solenoid", "Pneumatic", "Electromagnetic", "Electric", "Electromechanical", "Mechanical"],
+    "Numeric attributes": {
+        "Max pressure": {"bar": [10, 7]},
+        "Min pressure": {"bar": [2.5, 0]},
+        "Voltage": {"Vdc": [24]},
+        "Power draw": {"W": [0.35, 1.5]}},
+    "Categorical attributes": {
+        "Manufacturer": ["Festo", "SMC"],
+        "Valve type": ["3/2 way NC", "5/2 way monostable"]},
+    "Image paths": ["img1351.jpg"],
+    "F3D folder path": "f3d_images_14",
+}
 
-autodex.add(soda={
-    "cusoco": 4,
-    "storage_unit": "Parent",
-    "container_type": "Child",
-    "location": {
-        "Cusoco": 2
-    },
-    "name": f"child 1",
-    "description": "A child of #2.",
-    "image_paths": [],
-    "contents": []
-}, on_duplicates_found="overwrite")
+autodex_V2.load_file()  # Load fida and header from file on disk into global variables.
 
-autodex.add(soda={
-    "cusoco": 5,
-    "storage_unit": "Parent",
-    "container_type": "Child",
-    "location": {
-        "Cusoco": 2
-    },
-    "name": f"child 2",
-    "description": "Another child, also of #2.",
-    "image_paths": [],
-    "contents": []
-}, on_duplicates_found="overwrite")
+print(autodex_V2.add_soda(soda, commit=False))
+# By doing commit=False, it doesn't actually add the soda, but returns errors as if it did.
+# This way we can see if there are problems with the soda.
 
-print(1, autodex.exists(search_soda={"storage_unit": "Some storage unit",
-                                     "container_type": "A box",
-                                     "location": {
-                                         "Floor": 4,
-                                         "X": 7,
-                                         "Z": 2
-                                     }}, partial_coords=True))
+if "y" == input("Add soda? (Y/N)").lower():
+    returned = autodex_V2.add_soda(soda, commit=True)
 
-autodex.change(cusoco=1, soda={"name": "this is now changed!",
-                               "description": "screw this!",
-                               "contents": ["m4 screws", "m5 screws"]})
+    if type(returned) is list:
+        print("Successful")
+    else:
+        print(returned)
 
-print(2, autodex.get(search_soda={"cusoco": 2}))
+for soda in autodex_V2.get_fida():  # Get list of all sodas,
+    print(soda)                     # and print each soda individually.
 
-print(3, autodex.get(search_soda={"description": "this"}, partial_description=True))
-
-print(4, autodex.get(search_soda={"contents": "screw"}, partial_contents=True))
-
-print(5, autodex.get(search_soda={"location": {"Floor": 4,
-                                               "X": 7,
-                                               "Y": [1, 2, 3],
-                                               "Z": 2}}, partial_coords=True))
-
-print(6, autodex.get(search_soda={"contents": ['m4 screws']}, partial_contents=True))
-
-print(7, autodex.get(search_soda={"description": "this"}, partial_description=True))
-
-autodex.remove(cusoco=2)
-
-autodex.save()  # Actually write the data to a disk.
+autodex_V2.save_file()  # Save fida and header to file on disk.
