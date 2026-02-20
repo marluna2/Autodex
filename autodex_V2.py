@@ -165,9 +165,6 @@ def standalone_check(soda: dict, header: [dict, None] = None) -> [None, str]:
                 if type(j) not in (int, float):
                     return f"E030 Numeric attribute {key} value {u} must be int or float, not {type(j)}"
 
-                if not j:
-                    return f"E031 Numeric attribute {key} value {u} value mustn't be empty"
-
                 if j in seen:
                     return f"E032 Numeric attribute {key} value {u} mustn't have duplicates in it"
 
@@ -315,10 +312,11 @@ def collective_check(soda: dict, fida: [List[dict], None] = None, header: [dict,
 
     for i in fida:
 
-        for key in ("Cusoco", "Name"):
+        if i["Cusoco"] == soda["Cusoco"]:
+            return f"E054 Cusoco = {soda['Cusoco']} already used"
 
-            if i[key] == soda[key]:
-                return f"E054 {key} = {soda[key]} already used by #{i['Cusoco']}"
+        if i["Name"] == soda["Name"]:
+            return f"E009 Name = {soda['Name']} already used by #{i['Cusoco']}"
 
         i_storage_unit = i["Storage unit"]
         soda_storage_unit = soda["Storage unit"]
@@ -1005,9 +1003,6 @@ def change_soda(cusoco: int, changed_soda: dict, commit: bool) -> [str, list]:
 
 def get_fida() -> List[dict]:
     """Copies global_fida. Use this instead of global_fida.copy() to avoid working with global_fida directly"""
-
-    if not _global_fida:
-        raise AutodexException("E009 No fida loaded")
 
     return _global_fida.copy()
 

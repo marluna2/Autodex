@@ -1,47 +1,28 @@
 [
   {
     "Autodex version": "V2 (1.2.2026)",
-    "Last saved": "2026-02-17T18:16:55.010556Z",
+    "Last saved": "2026-02-20T23:24:42.638572Z",
     "Date format": "%Y-%m-%dT%H:%M:%S.%fZ",
     "Storage units": {
-      "Small shelf": {
+      "Small wood shelf": {
         "Floor": [
           1,
-          7
+          6
         ],
         "X": [
-          0,
-          2
-        ],
-        "Y": [
-          1,
-          7
-        ],
-        "Z": [
           1,
           5
-        ]
-      },
-      "Large shelf": {
-        "foo": [
-          1,
+        ],
+        "Depth": [
+          0,
           1
         ]
       }
     },
     "Container types": {
-      "Greiner small": {
-        "Small shelf": {
-          "Y": 1
-        }
-      },
-      "Greiner large": {
-        "Small shelf": {
-          "Y": 3,
-          "Z": 3
-        },
-        "Large shelf": {
-          "foo": 1
+      "Blue box S": {
+        "Small wood shelf": {
+          "X": 2
         }
       }
     },
@@ -86,6 +67,14 @@
           "*": 1000
         },
         "kV": {
+          "/": 1000
+        }
+      },
+      "W": {
+        "mW": {
+          "*": 1000
+        },
+        "kW": {
           "/": 1000
         }
       },
@@ -134,334 +123,15 @@
     },
     "Numeric attributes": {
       "Current": "A",
-      "Pressure": "bar",
+      "Max pressure": "bar",
+      "Min pressure": "bar",
       "Height": "cm",
       "Length": "cm",
       "Width": "cm",
       "Temperature": "\u00b0C",
-      "Voltage": "V"
+      "Voltage DC": "V",
+      "Power": "W"
     }
   },
-  [
-    {
-      "Cusoco": 1,
-      "Storage unit": "Small shelf",
-      "Container type": "Greiner large",
-      "Location": {
-        "Floor": 2,
-        "X": 1,
-        "Y": 4,
-        "Z": 3
-      },
-      "Name": "Test box",
-      "Description": "Hello world!",
-      "Contents": [
-        "Item a",
-        "Item b",
-        "Item c"
-      ],
-      "Tags": [
-        "Valve",
-        "Pneumatic",
-        "Electromagnetic",
-        "Electric",
-        "Electromechanical",
-        "Mechanical"
-      ],
-      "Numeric attributes": {
-        "Pressure": {
-          "bar": [
-            62.3,
-            38
-          ]
-        },
-        "Voltage": {
-          "V": [
-            65,
-            132
-          ],
-          "kV": [
-            1
-          ]
-        },
-        "Current": {
-          "A": [
-            65,
-            132
-          ],
-          "mA": [
-            1
-          ]
-        }
-      },
-      "Categorical attributes": {
-        "Manufacturer": [
-          "Rexroth",
-          "SMC",
-          "Festo"
-        ],
-        "Valve type": [
-          "3/2 Way",
-          "5/2 Way"
-        ]
-      },
-      "Image paths": [],
-      "F3D folder path": "",
-      "Date created": "2025-12-27T19:48:21.569113Z",
-      "Date changed": ""
-    },
-    {
-      "Cusoco": 2,
-      "Storage unit": "Small shelf",
-      "Container type": "Greiner large",
-      "Location": {
-        "Floor": 1,
-        "X": 1,
-        "Y": 4,
-        "Z": 3
-      },
-      "Name": "Test box 2",
-      "Description": "Hello world!",
-      "Contents": [
-        "Item a",
-        "Item b",
-        "Item c"
-      ],
-      "Tags": [
-        "Valve",
-        "Pneumatic",
-        "Electromagnetic",
-        "Electric",
-        "Electromechanical",
-        "Mechanical"
-      ],
-      "Numeric attributes": {
-        "Pressure": {
-          "bar": [
-            6.3,
-            8
-          ]
-        },
-        "Voltage": {
-          "V": [
-            6,
-            12
-          ],
-          "mV": [
-            24
-          ]
-        }
-      },
-      "Categorical attributes": {
-        "Manufacturer": [
-          "Rexroth",
-          "SMC",
-          "Festo"
-        ],
-        "Valve type": [
-          "3/2 Way",
-          "5/2 Way"
-        ]
-      },
-      "Image paths": [],
-      "F3D folder path": "",
-      "Date created": "2025-12-27T19:48:21.569113Z",
-      "Date changed": ""
-    },
-    {
-      "Cusoco": 3,
-      "Storage unit": "Small shelf",
-      "Container type": "Greiner large",
-      "Location": {
-        "Floor": 3,
-        "X": 1,
-        "Y": 4,
-        "Z": 3
-      },
-      "Name": "New Test box",
-      "Description": "Hello world!",
-      "Contents": [
-        "Item a",
-        "Item b",
-        "Item c"
-      ],
-      "Tags": [
-        "Valve",
-        "Pneumatic",
-        "Electromagnetic",
-        "Electric",
-        "Electromechanical",
-        "Mechanical"
-      ],
-      "Numeric attributes": {
-        "Pressure": {
-          "bar": [
-            62.3,
-            38
-          ]
-        },
-        "Voltage": {
-          "V": [
-            65,
-            132
-          ],
-          "kV": [
-            1
-          ]
-        },
-        "Current": {
-          "A": [
-            65,
-            132
-          ],
-          "mA": [
-            1
-          ]
-        }
-      },
-      "Categorical attributes": {
-        "Manufacturer": [
-          "Rexroth",
-          "SMC",
-          "Festo"
-        ],
-        "Valve type": [
-          "3/2 Way",
-          "5/2 Way"
-        ]
-      },
-      "Image paths": [],
-      "F3D folder path": "",
-      "Date created": "2026-02-03T19:18:17.594605Z",
-      "Date changed": ""
-    },
-    {
-      "Cusoco": 4,
-      "Storage unit": "Small shelf",
-      "Container type": "Greiner large",
-      "Location": {
-        "Floor": 1,
-        "X": 1,
-        "Y": 1,
-        "Z": 1
-      },
-      "Name": "New Test box 2",
-      "Description": "Hello world!",
-      "Contents": [
-        "Item a",
-        "Item b",
-        "Item c"
-      ],
-      "Tags": [
-        "Valve",
-        "Pneumatic",
-        "Electromagnetic",
-        "Electric",
-        "Electromechanical",
-        "Mechanical"
-      ],
-      "Numeric attributes": {
-        "Pressure": {
-          "bar": [
-            626.3,
-            38
-          ]
-        },
-        "Voltage": {
-          "V": [
-            65,
-            132
-          ],
-          "kV": [
-            1
-          ]
-        },
-        "Current": {
-          "A": [
-            65,
-            132
-          ],
-          "mA": [
-            1
-          ]
-        }
-      },
-      "Categorical attributes": {
-        "Manufacturer": [
-          "Rexroth",
-          "SMC",
-          "Festo"
-        ],
-        "Valve type": [
-          "3/2 Way",
-          "5/2 Way"
-        ]
-      },
-      "Image paths": [],
-      "F3D folder path": "",
-      "Date created": "2026-02-03T20:27:58.015661Z",
-      "Date changed": ""
-    },
-    {
-      "Cusoco": 62,
-      "Storage unit": "Small shelf",
-      "Container type": "Greiner large",
-      "Location": {
-        "Floor": 4,
-        "X": 1,
-        "Y": 4,
-        "Z": 3
-      },
-      "Name": "Test bosdfasdfx",
-      "Description": "Helloghkj world!",
-      "Contents": [
-        "Item aj",
-        "Item bjghjk",
-        "Item gjhkc"
-      ],
-      "Tags": [
-        "Valve",
-        "Pneumatic",
-        "Electromagnetic",
-        "Electric",
-        "Electromechanical",
-        "Mechanical"
-      ],
-      "Numeric attributes": {
-        "Voltage": {
-          "V": [
-            65,
-            132
-          ],
-          "kV": [
-            1
-          ]
-        },
-        "Current": {
-          "A": [
-            65,
-            132
-          ],
-          "mA": [
-            1
-          ]
-        }
-      },
-      "Categorical attributes": {
-        "Manufacturer": [
-          "Rexroth",
-          "SMC",
-          "Festo"
-        ],
-        "Valve type": [
-          "3/2 Way",
-          "5/2 Way"
-        ]
-      },
-      "Image paths": [],
-      "F3D folder path": "",
-      "Date created": "2026-02-06T21:59:31.610834Z",
-      "Date changed": ""
-    }
-  ]
+  []
 ]

@@ -1,5 +1,5 @@
 
-# Autodex - The automatic Part Indexing System
+# Autodex - The automatic part indexing system
 
 Autodex helps with storing and keeping track of large amounts of items in places like workshops.
 
@@ -45,7 +45,7 @@ f3d - Short for Fake 3D, this is a group of pictures taken at many angles around
 {
     "Cusoco": 14, # The container's id.
     "Storage unit": "Small wood shelf", # Where the container is stored.
-    "Container type": "Wood box medium", # What the container is.
+    "Container type": "Blue box S", # What the container is.
     "Location": {"Floor": 2, "X": 4, "Depth": 1}, # Where in the storage unit it is stored.
     "Name": "Solenoid air valves", # Something to identify the container.
     "Description": "Some of the seals might need to be replaced", # Notes about contents, can be empty: "".
@@ -54,20 +54,20 @@ f3d - Short for Fake 3D, this is a group of pictures taken at many angles around
     "Numeric attributes": { # New feature. Used for sorting and filtering.
         "Max pressure": {"bar": [10, 7]},
         "Min pressure": {"bar": [2.5, 0]},
-        "Voltage": {"Vdc": [24]},
-        "Power draw": {"W": [0.35, 1.5]}},
+        "Voltage DC": {"V": [24]},
+        "Power": {"W": [0.35, 1.5]}},
     "Categorical attributes": { # New feature. Used for sorting and filtering.
         "Manufacturer": ["Festo", "SMC"],
         "Valve type": ["3/2 way NC", "5/2 way monostable"]},
-    "Image paths": ["img1351.jpg"], # List of images for the contents of the container.
-    "F3D folder path": "f3d_images_14", # New feature. The path leads to a folder containing a folder. Each of the folders is for one object each, and contains many images of it.
+    "Image paths": ["img1234.jpg"], # List of images for the contents of the container.
+    "F3D folder path": "images_1234", # New feature. The path leads to a folder containing a folder. Each of the folders is for one object each, and contains many images of it.
     "Date created": "2025-12-27T19:48:21.569113Z", # Date of creation.
     "Date changed": "2025-12-28T20:22:36.310473Z"  # Last changed date.
 }
+
 ```
 
-
-###
+### 
 
 ![image](https://github.com/user-attachments/assets/dd3e1f34-a876-424c-8d39-0d33091552ba)
 
@@ -89,28 +89,31 @@ soda = {
     "Numeric attributes": {
         "Max pressure": {"bar": [10, 7]},
         "Min pressure": {"bar": [2.5, 0]},
-        "Voltage": {"Vdc": [24]},
-        "Power draw": {"W": [0.35, 1.5]}},
+        "Voltage DC": {"V": [24]},
+        "Power": {"W": [0.35, 1.5]}},
     "Categorical attributes": {
         "Manufacturer": ["Festo", "SMC"],
         "Valve type": ["3/2 way NC", "5/2 way monostable"]},
-    "Image paths": ["img1351.jpg"],
-    "F3D folder path": "f3d_images_14",
+    "Image paths": [],
+    "F3D folder path": "",
 }
 
 autodex_V2.load_file()  # Load fida and header from file on disk into global variables.
 
-print(autodex_V2.add_soda(soda, commit=False))
+message = autodex_V2.add_soda(soda, commit=False)
 # By doing commit=False, it doesn't actually add the soda, but returns errors as if it did.
 # This way we can see if there are problems with the soda.
 
-if "y" == input("Add soda? (Y/N)").lower():
-    returned = autodex_V2.add_soda(soda, commit=True)
+print(message)
 
-    if type(returned) is list:
-        print("Successful")
-    else:
-        print(returned)
+if type(message) is list:
+    if "y" == input("Add soda? (Y/N)").lower():
+        returned = autodex_V2.add_soda(soda, commit=True)
+
+        if type(returned) is list:
+            print("Successful")
+        else:
+            print(returned)
 
 for soda in autodex_V2.get_fida():  # Get list of all sodas,
     print(soda)                     # and print each soda individually.
@@ -121,7 +124,7 @@ autodex_V2.save_file()  # Save fida and header to file on disk.
 
 ## Setup
 
-To specify new storage units, container types, or more, go into your safe file (usually "autodex_data.json").
+To specify new storage units, container types, or more, go into your safe file (normally "autodex_data.json").
 The file consists of the header at the top and the fida at the bottom.
 The header is where values about how the sodas are stored is specified.
 Most of the values in the header can't be changed by the program, because changes could destroy large amounts of data,
