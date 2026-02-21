@@ -130,6 +130,9 @@ The header is where values about how the sodas are stored is specified.
 Most of the values in the header can't be changed by the program, because changes could destroy large amounts of data,
 and changes are not supposed to be common.
 
+Changing the header might result in errors, because existing sodas will still have the old header values.
+This is why change_numeric_attributes exists, which updates all old soda values to prevent errors.
+
 
 ## License
 
