@@ -75,7 +75,7 @@ f3d - Short for Fake 3D, this is a group of pictures taken at many angles around
 ## Usage/Examples
 
 ``` python
-import autodex_V2
+import autodex
 
 soda = {
     "Cusoco": 14,
@@ -98,9 +98,9 @@ soda = {
     "F3D folder path": "",
 }
 
-autodex_V2.load_file()  # Load fida and header from file on disk into global variables.
+autodex.load_file()  # Load fida and header from file on disk into global variables.
 
-message = autodex_V2.add_soda(soda, commit=False)
+message = autodex.add_soda(soda, commit=False)
 # By doing commit=False, it doesn't actually add the soda, but returns errors as if it did.
 # This way we can see if there are problems with the soda.
 
@@ -108,17 +108,17 @@ print(message)
 
 if type(message) is list:
     if "y" == input("Add soda? (Y/N)").lower():
-        returned = autodex_V2.add_soda(soda, commit=True)
+        returned = autodex.add_soda(soda, commit=True)
 
         if type(returned) is list:
             print("Successful")
         else:
             print(returned)
 
-for soda in autodex_V2.get_fida():  # Get list of all sodas,
+for soda in autodex.get_fida():  # Get list of all sodas,
     print(soda)                     # and print each soda individually.
 
-autodex_V2.save_file()  # Save fida and header to file on disk.
+autodex.save_file()  # Save fida and header to file on disk.
 ```
 
 

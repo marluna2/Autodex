@@ -1,775 +1,1061 @@
-"""
-Responsible for storing, changing and retrieving data about containers and their contents.
-
-cusoco - The custom sorting code, is assigned to each and every container and must only exist once.
-It is the only identifier about a container, as all the other information is stored in a .json file.
-
-soda - The sorting data, is the full dictionary with cusoco, date of creation, name, ect. of a container.
-
-fida - The file data, is the complete data from the autodex_data.json file, consisting of dictionaries in a list.
-
-Common arguments:
-cusoco: An individual id given to every container, irrespective of type or location.\n
-storage_unit: In which piece of furniture the container is stored, can also be "Parent".\n
-location: Where in that storage unit it's located, or parent cusoco: section 5 depth 2 x-axis 6 / .\n
-name: A general description of its contents: screws / small switches.\n
-image_paths: File paths from images of its contents.\n
-contents: List of the containers contents excluding children: m4 screws, m5 screws.\n
-description: Simple description of where contents may stem from, or use cases: dryer / pump.\n
-
-A complete soda looks like this: {
-"cusoco": 2,
-"storage_unit": "small_shelf_even",
-"container_type": "greiner_small",
-"location": {
-"floor": 2,
-"x": 1,
-"y": 1,
-"z": 1
-},
-"name": "test 1",
-"description": "",
-"image_paths": [],
-"contents": [],
-"date_created": "2025-01-16T23:00:12.978108Z",
-"date_changed": "2025-01-16T23:00:40.654869Z"
-    }
-"""
+import datetime
 import json
-import math
-import os.path
-import itertools
 import shutil
-import time
-from datetime import datetime
 from operator import itemgetter
-from typing import Literal, List
+from pathlib import Path
+from typing import Literal, List, Union
 
-_data_path = "autodex_data.json"
-_container_types = {"Greiner Small": {"Small shelf": {"Y": 2}},
-                    "Greiner large": {"Small shelf": {"Y": 3}, "Large shelf": {}},
-                    "bag": {"parent": {}}}
-_storage_units = {
-    "Small shelf":
-        {
-            "Floor": range(1, 8),
-            "X": range(1, 9),
-            "Y": range(1, 8),
-            "Z": range(1, 3)
-        },
-    "Large shelf":
-        {"foo": range(1, 5)}
-}
-
-
-def _pre_code_fida_integrity_checks():
-    if not _data_path.endswith(".json"):
-        raise Exception("File type has to be .json.")
-    elif not os.path.isfile(_data_path):
-        raise Exception("File not found.")
-    elif not json.load(open(_data_path, "r")):
-        raise Exception("Warning: File may or may not be corrupted. "
-                        f"To continue once anyway, replace the file's contents with "
-                        f"[\"corruption safety override\"]")
-    elif json.load(open(_data_path, "r")) == [{}]:
-        raise Exception("File may be corrupted.")
-
-    if (json.load(open(_data_path, "r")) ==
-            ["corruption safety override"]):  # If the corruption safety has been overridden,
-        with open(_data_path, "w") as file:
-            json.dump([], file, indent=4)  # clear the file of the override key the file and continue.
-
-        print(f"{5 * '#'} Corruption safety has been overridden, executing code. {5 * '#'}")
-
+_save_path = "autodex_data.json"
 
 _template_soda = {
-    "cusoco": "Preset",
-    "storage_unit": "Preset",
-    "container_type": "Preset",
-    "location": "Preset",
-    "name": None,
-    "description": None,
-    "image_paths": "Preset",
-    "contents": "Preset",
-    "date_created": "Preset",
-    "date_changed": "Preset"
+    "Cusoco": int,
+    "Storage unit": str,
+    "Container type": str,
+    "Location": dict,
+    "Name": str,
+    "Description": str,
+    "Contents": list,
+    "Tags": list,
+    "Numeric attributes": dict,
+    "Categorical attributes": dict,
+    "Image paths": list,
+    "F3D folder path": str,
+    "Date created": str,
+    "Date changed": str
 }
-_date_format = "%Y-%m-%dT%H:%M:%S.%fZ"
+_template_header = {
+    "Autodex version": str,
+    "Last saved": str,
+    "Date format": str,
+    "Storage units": dict,
+    "Container types": dict,
+    "Unit conversions": dict,
+    "Numeric attributes": dict
+}
 _global_fida = []
-_container_types.update({"Child": {"Parent": {}}})
-_storage_units.update({"Parent": {"Cusoco": float("inf")}})
-_pre_code_fida_integrity_checks()
-try:
-    with open(_data_path, "r") as _fida:
-        _global_fida = json.load(_fida)
-except json.decoder.JSONDecodeError:  # If the file can't be read, error out.
-    raise Exception(f"File {_data_path} corrupted.")
+_global_header = {}
 
 
-def _read() -> List[dict]:
+class AutodexException(Exception):
+    """Used to separate intentional from unintentional exceptions by removing catch-all try-except statements"""
+
+    pass
+
+
+def standalone_check(soda: dict, header: [dict, None] = None) -> [None, str]:
+    """Check if a soda is valid, without taking stored sodas into consideration"""
+
+    if header is None:
+        header = _global_header.copy()
+
+    date_format = header["Date format"]
+    container_types = header["Container types"]
+    storage_units = header["Storage units"]
+
+    if type(soda) is not dict:
+        return f"E014 Soda must be dict, not {type(soda)}"
+
+    if soda.keys() != _template_soda.keys():
+        invalid_keys = []
+        missing_keys = []
+
+        soda_keys = soda.keys()
+        template_keys = _template_soda.keys()
+
+        for soda_key in soda_keys:
+            if soda_key not in template_keys:
+                invalid_keys.append(soda_key)
+
+        for template_key in template_keys:
+            if template_key not in soda_keys:
+                missing_keys.append(template_key)
+
+        return f"E015 Soda has invalid {invalid_keys} or missing {missing_keys} keys"
+
+    for key, value in soda.items():
+
+        if type(value) is not _template_soda[key]:
+            return f"E016 {key} value data type must be {_template_soda[key]}, not {type(value)}"
+
+    # region Name
+
+    if not soda["Name"].strip():
+        return "E017 Name mustn't be empty"
+
+    # endregion
+    # region Cusoco
+
+    soda_cusoco = soda["Cusoco"]
+
+    if soda_cusoco < 1:
+        return f"E018 Cusoco must be greater than 0, not {soda_cusoco}"
+
+    # endregion
+    # region Storage unit
+
+    soda_storage_unit = soda["Storage unit"]
+
+    if soda_storage_unit not in storage_units.keys():
+        return f"E019 Storage unit {soda_storage_unit} isn't listed in file header"
+
+    # endregion
+    # region Container type
+
+    soda_container_type = soda["Container type"]
+
+    if soda_container_type not in container_types.keys():
+        return f"E020 Container type {soda_container_type} isn't listed in file header"
+
+    if soda_storage_unit not in container_types[soda_container_type].keys():
+        return (f"E021 Storage unit {soda_storage_unit} is incompatible with container type"
+                f" {soda_container_type}")
+
+    # endregion
+    # region Contents, Tags, Image paths
+
+    for key in ("Contents", "Tags", "Image paths"):
+
+        seen = []
+        soda_key = soda[key]
+        for i in soda_key:
+
+            if type(i) is not str:
+                return f"E022 {key} must only contain str, not {type(i)}"
+
+            if i in seen:
+                return f"E023 {key} mustn't contain duplicates: {i}"
+
+            if not i.strip():
+                return f"E024 {key} mustn't contain empty items"
+
+            seen.append(i)
+
+    # endregion
+    # region Numeric attributes
+
+    for key, value in soda["Numeric attributes"].items():
+
+        if type(value) is not dict:
+            return f"E025 Numeric attributes {key} must be in dict, not {type(value)}"
+
+        if key not in header["Numeric attributes"].keys():
+            return f"E026 Invalid numeric attribute: {key}"
+
+        if not value:
+            return f"E119 Numeric attribute {key} mustn't be empty"
+
+        possible_units = get_unit_conversions(header["Numeric attributes"][key], True, header)
+
+        for i in value.keys():
+
+            if i not in possible_units:
+                return f"E027 The numeric attribute {key} unit {i} is not compatible with {key}"
+
+        for u, i in value.items():
+
+            if type(i) is not list:
+                return f"E028 Numeric attribute {key} value {u} must be list, not {type(i)}"
+
+            if not i:
+                return f"E029 Numeric attribute {key} value {u} mustn't be empty"
+
+            seen = []
+            for j in i:
+
+                if type(j) not in (int, float):
+                    return f"E030 Numeric attribute {key} value {u} must be int or float, not {type(j)}"
+
+                if j in seen:
+                    return f"E032 Numeric attribute {key} value {u} mustn't have duplicates in it"
+
+                seen.append(j)
+
+    # endregion
+    # region Categorical attributes
+
+    for key, value in soda["Categorical attributes"].items():
+
+        if type(value) is not list:
+            return f"E033 Categorical attribute {key} values must be in list, not {type(value)}"
+
+        seen = []
+        for i in value:
+
+            if type(i) is not str:
+                return f"E034 Categorical attribute {key} value {i} must be str, not {type(i)}"
+
+            if not i.strip():
+                return f"E035 Categorical attribute {key} mustn't be empty"
+
+            if i in seen:
+                return f"E036 Categorical attribute {key} contains duplicates: {i}"
+
+            seen.append(i)
+
+    # endregion
+    # region Image paths
+
+    for i in soda["Image paths"]:
+
+        if not Path(i).exists():
+            return f"E037 Image path not found: {i}"
+
+        if not i.endswith((".png", ".jpg", ".jpeg", ".gif", ".tif", ".tiff", ".webp", ".bmp", ".svg")):
+            return f"E038 Image path must lead to an image type file: {i}"
+
+    # endregion
+    # region F3D folder path
+
+    soda_f3d_folder_path = soda["F3D folder path"]
+
+    if soda_f3d_folder_path:
+
+        path = Path(soda_f3d_folder_path)
+
+        if not path.exists():
+            return f"E039 F3D folder path not found: {str(path.absolute())}"
+
+        if not path.is_dir():
+            return f"E040 F3D folder path isn't a directory: {str(path.absolute())}"
+
+        for i in path.iterdir():
+            if not i.is_dir():
+                return f"E041 F3D folder mustn't contain files: {str(path.absolute())}"
+
+        for i in path.iterdir():
+            for j in i.iterdir():
+
+                if j.is_dir():
+                    return f"E042 F3D image group contains folders: {str(path.absolute())}"
+
+                if not str(j).endswith((".png", ".jpg", ".jpeg", ".gif", ".tif", ".tiff", ".webp", ".bmp", ".svg")):
+                    return f"E043 F3D image group contains non-image type file: {str(path.absolute())}"
+
+    # endregion
+    # region Location
+
+    limits = storage_units[soda_storage_unit]
+    size = container_types[soda_container_type][soda_storage_unit]
+    location = soda["Location"]
+
+    if limits.keys() != location.keys():
+        return f"E044 Invalid location keys"
+
+    location_plus_size = location.copy()
+
+    for key, value in size.items():
+        location_plus_size[key] += value - 1
+
+    for key, value in location.items():
+        key_limits = limits[key]
+        if value < key_limits[0] or value > key_limits[1]:
+            return f"E045 Base location out of bounds: {key}: {value} doesn't fit in {key_limits}"
+        if type(value) is not int:
+            return f"E046 Location {key} must be int, not {type(value)}"
+
+    for key, value in location_plus_size.items():
+        key_limits = limits[key]
+        if value < key_limits[0] or value > key_limits[1]:
+            return (f"E047 Location combined with container size out of bounds: {key}: {value} doesn't fit in"
+                    f" {key_limits}")
+
+    # endregion
+    # region Date created
+
+    soda_date_created = soda["Date created"]
+
+    if not soda_date_created:
+        return "E048 Creation date mustn't be empty"
+
+    try:
+        date_created = datetime.datetime.strptime(soda_date_created, date_format)
+
+    except ValueError:
+        return f"E049 Invalid creation date: {soda_date_created}"
+
+    if date_created > datetime.datetime.now():
+        return f"E050 Creation date mustn't be in the future: {soda_date_created}"
+
+    # endregion
+    # region Date changed
+
+    soda_date_changed = soda["Date changed"]
+
+    if soda_date_changed:
+
+        try:
+            date_changed = datetime.datetime.strptime(soda_date_changed, date_format)
+
+        except ValueError:
+            return f"E051 Invalid change date: {soda_date_changed}"
+
+        if date_changed > datetime.datetime.now():
+            return f"E052 Change date mustn't be in the future: {soda_date_changed}"
+
+    # endregion
+
+
+def collective_check(soda: dict, fida: [List[dict], None] = None, header: [dict, None] = None) -> [None, str]:
+    """Check if a soda is valid, and if it doesn't have matching values of existing sodas"""
+
+    if fida is None:
+        fida = _global_fida.copy()
+
+    if header is None:
+        header = _global_header.copy()
+
+    container_types = header["Container types"]
+
+    standalone_return = standalone_check(soda, header)
+    if standalone_return:
+        return f"E053 {standalone_return}"
+
+    for i in fida:
+
+        if i["Cusoco"] == soda["Cusoco"]:
+            return f"E054 Cusoco = {soda['Cusoco']} already used"
+
+        if i["Name"] == soda["Name"]:
+            return f"E009 Name = {soda['Name']} already used by #{i['Cusoco']}"
+
+        i_storage_unit = i["Storage unit"]
+        soda_storage_unit = soda["Storage unit"]
+
+        if i_storage_unit == soda_storage_unit:
+            a = soda["Location"]
+            b = i["Location"]
+
+            size_a = container_types[soda["Container type"]][soda_storage_unit]
+            size_b = container_types[i["Container type"]][i_storage_unit]
+
+            a_plus_size = a.copy()
+            b_plus_size = b.copy()
+
+            for key, value in size_a.items():
+                a_plus_size[key] += value - 1
+
+            for key, value in size_b.items():
+                b_plus_size[key] += value - 1
+
+            overlapping = True
+            for key, a_key_value in a.items():
+                b_key_value = b[key]
+
+                a_key_plus_size = a_plus_size[key]
+                b_key_plus_size = b_plus_size[key]
+
+                if not (a_key_value <= b_key_plus_size and a_key_plus_size >= b_key_value):
+                    overlapping = False
+                    break
+        else:
+            overlapping = False
+
+        if overlapping:
+            return f"E055 Location is overlapping #{i['Cusoco']}'s location"
+
+
+def fida_check(fida: List[dict], header: [dict, None] = None) -> [None, str]:
+    """Check if fida is fully valid"""
+
+    for i in fida:
+
+        fida_copy = fida.copy()
+        fida_copy.remove(i)
+
+        check_return = collective_check(i, fida_copy, header)
+        if check_return:
+            return f"E056 Soda #{i['Cusoco']}: {check_return}"
+
+
+def _header_check(header: dict, check_all: bool = True) -> [None, str]:
+    """Checks if header is valid"""
+
+    modified_template_header = _template_header.copy()
+    if not check_all:
+        modified_template_header.pop("Last saved")
+        modified_template_header.pop("Autodex version")
+
+    if type(header) is not dict:
+        return f"E057 Header must be dict, not {type(header)}"
+
+    # Top-level key check
+    if header.keys() != modified_template_header.keys():
+        invalid_keys = []
+        missing_keys = []
+
+        header_keys = header.keys()
+        template_keys = modified_template_header.keys()
+
+        for header_key in header_keys:
+            if header_key not in template_keys:
+                invalid_keys.append(header_key)
+
+        for template_key in template_keys:
+            if template_key not in header_keys:
+                missing_keys.append(template_key)
+
+        return f"E058 Header has invalid {invalid_keys} or missing {missing_keys} keys"
+
+    # Top-level data type check
+    for key, value_type in modified_template_header.items():
+        if type(header[key]) is not value_type:
+            return f"E059 Header {header[key]} must be {value_type}, not {type(header[key])}"
+
+    # Last saved and date format check
+    try:
+        datetime.datetime.strftime(datetime.datetime.now(), header["Date format"])
+    except ValueError:
+        return f"E060 Invalid date format: {header['Date format']}"
+
+    if check_all:
+        try:
+            datetime.datetime.strptime(header["Last saved"], header["Date format"])
+        except ValueError:
+            return f"E061 Last saved invalid: {header['Last saved']}"
+
+    # In-depth storage units check
+    for storage_unit, value in header["Storage units"].items():
+
+        if type(value) is not dict:
+            return (f"E062 Storage unit {storage_unit} axes and their limits must be provided in a dict with axes as "
+                    f"keys and their limits as values: {value} must be dict, not {type(value)}")
+
+        for axis, limit_values in value.items():
+
+            if type(limit_values) is not list:
+                return (f"E063 Storage unit position limit values for each axis must be in a list, not "
+                        f"{type(limit_values)}")
+
+            if len(limit_values) != 2:
+                return (f"E064 Storage unit position limit values for each axis must be provided in a list with a "
+                        f"length of 2, not {len(limit_values)}")
+
+            for i in limit_values:
+                if type(i) is not int:
+                    return f"E065 Storage unit position limit values for each axis must be int, not {type(i)}"
+
+            if limit_values[0] > limit_values[1]:
+                return (f"E066 The first value mustn't be higher "
+                        f"than the second value for the storage unit position limits for each axis "
+                        f"({storage_unit}: {axis}: {limit_values})")
+
+    # In-depth container types check
+    for container_type, value in header["Container types"].items():
+
+        if type(value) is not dict:
+            return f"E067 Container sizes must be in dict, not {type(value)}"
+
+        for storage_unit, sizes in value.items():
+
+            if storage_unit not in header["Storage units"].keys():
+                return f"E068 Container size dict has invalid storage unit: {storage_unit}"
+
+            if type(sizes) is not dict:
+                return f"E069 Container size dicts must only contain dicts, not {type(sizes)}"
+
+            for axis_name, axis_size in sizes.items():
+
+                if axis_name not in header["Storage units"][storage_unit]:
+                    return (f"E070 Container size axis name invalid for associated storage unit: "
+                            f"{({axis_name: axis_size})}")
+
+                if type(axis_size) is not int:
+                    return f"E071 Container sizes must be int, not {type(axis_size)}"
+
+                if axis_size < 1:
+                    return f"E072 Container size must be greater than 0, not {axis_size}"
+
+                axis_limits = header["Storage units"][storage_unit][axis_name]
+                axis_max_size = axis_limits[1] - axis_limits[0] + 1
+
+                if axis_size > axis_max_size:
+                    return f"E073 Container too large for associated storage unit: {({axis_name: axis_size})}"
+
+    # In-depth unit conversions check
+    seen_units = list(header["Unit conversions"].keys())
+    for base_unit, value in header["Unit conversions"].items():
+
+        if not base_unit.strip():
+            return f"E074 Base unit name mustn't be empty"
+
+        if base_unit.strip() != base_unit:
+            return f"E075 Base unit name mustn't have leading or trailing spaces"
+
+        if type(value) is not dict:
+            return f"E076 Unit conversion must be dict, not {type(value)} ({base_unit})"
+
+        for sub_unit, sub_conversion in value.items():
+
+            if not sub_unit.strip():
+                return f"E077 Sub-unit name mustn't be empty for ({base_unit})"
+
+            if sub_unit.strip() != sub_unit:
+                return f"E078 Sub-unit name mustn't contain leading or trailing spaces ({base_unit})"
+
+            if sub_unit == base_unit:
+                return f"E079 Sub-unit can't be the same as base unit ({base_unit})"
+
+            if type(sub_conversion) is not dict:
+                return f"E080 Sub-unit conversion must be dict, not {type(sub_conversion)} ({base_unit})"
+
+            if not sub_conversion:
+                return f"E081 Sub-unit conversion dict mustn't be empty ({base_unit})"
+
+            for i, j in sub_conversion.items():
+
+                if i not in ["+", "-", "*", "/"]:
+                    return f"E082 Sub-unit conversion dict must only have + - * /, not {i} ({base_unit})"
+
+                if type(j) not in [int, float]:
+                    return f"E083 Sub-unit conversion values must be int or float, not {type(j)} ({base_unit})"
+
+            operations = sub_conversion.keys()
+
+            if "+" in operations and "-" in operations:
+                return f"E084 Sub-unit conversion dict mustn't have both + and - in it ({base_unit})"
+
+            if "*" in operations and "/" in operations:
+                return f"E085 Sub-unit conversion dict mustn't have both * and / in it ({base_unit})"
+
+            if sub_unit in seen_units:
+                return f"E086 Sub-unit has already been declared as a unit ({base_unit})"
+
+            seen_units.append(sub_unit)
+
+    # In-depth numeric attributes check
+    for key, value in header["Numeric attributes"].items():
+
+        if type(value) is not str:
+            return f"E087 Numeric attribute units must be str, not {type(value)} ({key})"
+
+        if value.strip() != value:
+            return f"E088 Numeric attribute units mustn't contain leading or trailing spaces ({key})"
+
+        unit_check_return = unit_check(value, False, header)
+        if unit_check_return:
+            return f"E089 Invalid numeric attribute unit: {unit_check_return} ({key})"
+
+
+def _file_check(path: str) -> [None, str]:
+    """Checks integrity of fida and header of file"""
+
+    try:
+        with open(path, "r", encoding="utf-8") as file:
+            data = json.load(file)
+
+    except json.decoder.JSONDecodeError as error:
+        return f"E090 Couldn't decode file: {error}"
+
+    except FileNotFoundError:
+        return f"E091 File not found"
+
+    if len(data) != 2:
+        return f"E092 Length of outer list in file must be 2, not {len(data)}"
+
+    header = data[0]
+    fida = data[1]
+
+    if type(header) is not dict:
+        return f"E093 Header must be a dict, not {type(header)}"
+    if type(fida) is not list:
+        return f"E094 Fida must be a list, not {type(fida)}"
+
+    header_check_return = _header_check(header)
+    if header_check_return:
+        return f"E095 Header: {header_check_return}"
+
+    fida_check_return = fida_check(fida, header)
+    if fida_check_return:
+        return f"E096 Fida: {fida_check_return}"
+
+
+def unit_check(value: str, has_numbers: bool = True, header: [dict, None] = None) -> [None, str]:
+    """Checks if unit or value is valid"""
+
+    if header is None:
+        header = _global_header
+
+    value = value.strip()
+
+    if has_numbers:
+        if not value.startswith(("0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
+                                 ".0", ".1", ".2", ".3", ".4", ".5", ".6", ".7", ".8", ".9",
+                                 "-0", "-1", "-2", "-3", "-4", "-5", "-6", "-7", "-8", "-9",
+                                 "-.0", "-.1", "-.2", "-.3", "-.4", "-.5", "-.6", "-.7", "-.8", "-.9"
+                                 )):
+            return "E097 Value must start with a number"
+
+        number_str = ""
+        unit = ""
+
+        end_of_number = False
+        for i in value:
+
+            if i not in "0123456789.-":
+                end_of_number = True
+
+            if end_of_number:
+                unit += i
+            else:
+                number_str += i
+
+        try:
+            float(number_str)
+        except ValueError:
+            return "E098 Invalid number"
+
+    else:
+        unit = value
+
+    unit = unit.strip()
+
+    seen = False
+    for key, value in header["Unit conversions"].items():
+
+        if unit == key or unit in value.keys():
+            seen = True
+            break
+
+    if not seen:
+        return "E099 Invalid unit"
+
+
+def separate_number_and_unit(value: str) -> List[Union[float, str]]:
+    """Separates value into float and unit, raises exception if value is invalid"""
+
+    value = value.strip()
+
+    if not value.startswith(("0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
+                             ".0", ".1", ".2", ".3", ".4", ".5", ".6", ".7", ".8", ".9",
+                             "-0", "-1", "-2", "-3", "-4", "-5", "-6", "-7", "-8", "-9",
+                             "-.0", "-.1", "-.2", "-.3", "-.4", "-.5", "-.6", "-.7", "-.8", "-.9"
+                             )):
+        raise AutodexException("E001 Value must start with a number")
+
+    number_str = ""
+    unit = ""
+
+    end_of_number = False
+    for i in value:
+
+        if i not in "0123456789.-":
+            end_of_number = True
+
+        if end_of_number:
+            unit += i
+        else:
+            number_str += i
+
+    try:
+        number = float(number_str)
+    except ValueError:
+        raise AutodexException("E002 Invalid number")
+
+    unit = unit.strip()
+
+    seen = False
+    for key, value in _global_header["Unit conversions"].items():
+
+        if unit == key or unit in value.keys():
+            seen = True
+            break
+
+    if not seen:
+        raise AutodexException("E003 Invalid unit")
+
+    return [number, unit]
+
+
+def get_unit_conversions(unit: str, with_self: bool = False, header: [dict, None] = None) -> list:
+    """Returns list of all units that the given unit can be converted to, with or without itself"""
+
+    if header is None:
+        header = _global_header
+
+    unit = unit.strip()
+
+    for key, value in header["Unit conversions"].items():
+
+        if unit == key or unit in value.keys():
+            possible_units = list(value.keys())
+            possible_units.insert(0, key)
+
+            if not with_self:
+                possible_units.remove(unit)
+
+            return possible_units
+
+    raise AutodexException("E004 Invalid unit")
+
+
+def convert_unit(old_value: str, new_unit, with_prefix: bool = False) -> [int, str]:
+    """Converts old_value to new_unit, raises exception if values are invalid or incompatible"""
+
+    conversions = _global_header["Unit conversions"]
+
+    try:
+        old_number, old_unit = separate_number_and_unit(old_value)
+    except AutodexException:
+        raise AutodexException("E005 Invalid value")
+
+    try:
+        possible_units = get_unit_conversions(new_unit, True)
+    except AutodexException:
+        raise AutodexException("E006 New unit invalid")
+
+    if old_unit not in possible_units:
+        raise AutodexException("E007 Old unit incompatible with new unit")
+
+    if old_unit not in conversions.keys():
+        for key, values in conversions.items():
+
+            if old_unit in values.keys():
+                base_unit = key
+                old_conversion_dict = values[old_unit]
+
+        base_number = old_number
+
+        if "+" in old_conversion_dict.keys():
+            base_number -= old_conversion_dict["+"]
+        elif "-" in old_conversion_dict.keys():
+            base_number += old_conversion_dict["-"]
+
+        if "*" in old_conversion_dict.keys():
+            base_number /= old_conversion_dict["*"]
+        elif "/" in old_conversion_dict.keys():
+            base_number *= old_conversion_dict["/"]
+
+    else:
+        base_unit = old_unit
+        base_number = old_number
+
+    new_number = base_number
+
+    if not new_unit == base_unit:
+        new_conversion_dict = conversions[base_unit][new_unit]
+
+        if "*" in new_conversion_dict.keys():
+            new_number *= new_conversion_dict["*"]
+        elif "/" in new_conversion_dict.keys():
+            new_number /= new_conversion_dict["/"]
+
+        if "+" in new_conversion_dict.keys():
+            new_number += new_conversion_dict["+"]
+        elif "-" in new_conversion_dict.keys():
+            new_number -= new_conversion_dict["-"]
+
+    if with_prefix:
+        new_number = str(new_number) + new_unit
+
+    return new_number
+
+
+def change_numeric_attributes(
+        attribute: str,
+        operation:
+        Literal["change standard unit", "change unit bases", "rename", "merge", "add", "delete"],
+        commit: bool,
+        unit: str = None,
+        rename_to: str = None,
+        merge_into: str = None) -> [str, list, Literal[True]]:
+    """Change numeric attributes in the header. Makes changes to fida if required"""
+
+    numeric_attributes = _global_header["Numeric attributes"]
+
+    if operation in ["change standard unit", "change unit bases", "rename", "merge", "delete"]:
+
+        if attribute not in numeric_attributes.keys():
+            return "E100 Invalid attribute"
+
+    if operation in ["change standard unit", "change unit bases", "add"]:
+
+        if unit_check(unit, False):
+            return "E101 Invalid unit"
+
+    if operation in ["change standard unit", "change unit bases"]:
+
+        if unit == numeric_attributes[attribute]:
+            return "E102 Unit already saved"
+
+    if operation == "change standard unit":
+
+        if unit not in get_unit_conversions(numeric_attributes[attribute], True):
+            return "E103 Unit is in a different unit base"
+
+        if commit:
+            _global_header["Numeric attributes"][attribute] = unit
+
+        return True
+
+    if operation == "change unit bases":
+
+        if unit in get_unit_conversions(numeric_attributes[attribute], True):
+            return "E104 Unit is in the same unit base"
+
+        _global_header["Numeric attributes"][attribute] = unit.strip()
+
+        changes_list = []
+        for index in range(len(_global_fida)):
+            soda = _global_fida[index]
+
+            if attribute in soda["Numeric attributes"].keys():
+                changes_list.append(soda["Cusoco"])
+
+                if commit:
+                    soda["Numeric attributes"].pop(attribute)
+                    soda["Date changed"] = datetime.datetime.strftime(datetime.datetime.now(),
+                                                                      _global_header["Date format"])
+
+        return changes_list
+
+    if operation == "rename":
+
+        if attribute == rename_to:
+            return "E105 New attribute name mustn't be the same"
+
+        if rename_to in numeric_attributes.keys():
+            return "E106 New attribute name already taken"
+
+        if not rename_to.strip():
+            return "E107 New attribute name mustn't be empty"
+
+        changes_list = []
+        for index in range(len(_global_fida)):
+            soda = _global_fida[index]
+
+            if attribute in soda["Numeric attributes"].keys():
+                changes_list.append(soda["Cusoco"])
+
+                if commit:
+                    soda["Numeric attributes"][rename_to] = soda["Numeric attributes"].pop(attribute)
+                    soda["Date changed"] = datetime.datetime.strftime(datetime.datetime.now(),
+                                                                      _global_header["Date format"])
+
+        if commit:
+            _global_header["Numeric attributes"][rename_to] = _global_header["Numeric attributes"].pop(attribute)
+
+        return changes_list
+
+    if operation == "merge":
+
+        if merge_into not in numeric_attributes.keys():
+            return "E108 Invalid merge-into attribute"
+
+        if merge_into == attribute:
+            return "E109 Attribute mustn't merge with itself"
+
+        if numeric_attributes[attribute] not in get_unit_conversions(numeric_attributes[merge_into], True):
+            return "E110 Attributes must have the same unit base"
+
+        changes_list = []
+        for index in range(len(_global_fida)):
+            soda = _global_fida[index]
+
+            if attribute in soda["Numeric attributes"].keys():
+                changes_list.append(soda["Cusoco"])
+
+                if commit:
+                    if merge_into in soda["Numeric attributes"].keys():
+
+                        old_dict = soda["Numeric attributes"].pop(attribute)
+                        new_dict = soda["Numeric attributes"][merge_into]
+                        merged_dict = new_dict.copy()
+
+                        for key, value in old_dict.items():
+
+                            if key in new_dict.keys():
+                                merged_dict[key] = list(set(merged_dict[key]).union(value))
+
+                            else:
+                                merged_dict[key] = value
+
+                        soda["Numeric attributes"][merge_into] = merged_dict
+
+                    else:
+                        soda["Numeric attributes"][merge_into] = soda["Numeric attributes"].pop(attribute)
+
+                    soda["Date changed"] = datetime.datetime.strftime(datetime.datetime.now(),
+                                                                      _global_header["Date format"])
+
+        if commit:
+            _global_header["Numeric attributes"].pop(attribute)
+
+        return changes_list
+
+    if operation == "add":
+
+        if attribute in numeric_attributes.keys():
+            return "E111 Attribute exists already"
+
+        attribute = attribute.strip()
+
+        if not attribute:
+            return "E112 Attribute name mustn't be empty"
+
+        if commit:
+            _global_header["Numeric attributes"][attribute] = unit.strip()
+
+        return True
+
+    if operation == "delete":
+
+        changes_list = []
+        for index in range(len(_global_fida)):
+            soda = _global_fida[index]
+
+            if attribute in soda["Numeric attributes"].keys():
+                changes_list.append(soda["Cusoco"])
+
+                if commit:
+                    soda["Numeric attributes"].pop(attribute)
+
+                    soda["Date changed"] = datetime.datetime.strftime(datetime.datetime.now(),
+                                                                      _global_header["Date format"])
+
+        if commit:
+            _global_header["Numeric attributes"].pop(attribute)
+
+        return changes_list
+
+    raise AutodexException(f"E008 Invalid operation: {operation}")
+
+
+def add_soda(soda: dict, commit: bool) -> [str, list]:
+    """Creates a new soda in global_fida"""
+
+    soda = soda.copy()
+
+    if "Date created" in soda.keys() or "Date changed" in soda.keys():
+        return "E113 Soda mustn't contain Date created or Date changed"
+
+    soda["Date created"] = datetime.datetime.strftime(datetime.datetime.now(), _global_header["Date format"])
+    soda["Date changed"] = ""
+
+    check_return = collective_check(soda)
+
+    if check_return:
+        return f"E114 {check_return}"
+
+    if commit:
+        _global_fida.append(soda)
+
+    return [soda["Cusoco"]]
+
+
+def delete_soda(cusoco: int, commit: bool) -> [str, list]:
+    """Deletes a soda in global_fida"""
+
+    seen = False
+    for soda in _global_fida:
+
+        if soda["Cusoco"] == cusoco:
+            seen = True
+            break
+
+    if not seen:
+        return "E115 Invalid cusoco"
+
+    if commit:
+        for index in range(len(_global_fida)):
+            soda = _global_fida[index]
+
+            if soda["Cusoco"] == cusoco:
+                _global_fida.pop(index)
+                break
+
+    return [cusoco]
+
+
+def change_soda(cusoco: int, changed_soda: dict, commit: bool) -> [str, list]:
+    """Changes a soda in global_fida"""
+
     global _global_fida
+
+    if "Date created" in changed_soda.keys() or "Date changed" in changed_soda.keys():
+        return "E116 Soda mustn't contain Date created or Date changed"
+
+    test_fida = _global_fida.copy()
+
+    for index in range(len(test_fida)):
+        soda = test_fida[index]
+
+        if soda["Cusoco"] == cusoco:
+            test_fida.pop(index)
+
+            new_soda = soda.copy()
+            new_soda.update(changed_soda)
+            new_soda["Date changed"] = datetime.datetime.strftime(datetime.datetime.now(),
+                                                                  _global_header["Date format"])
+
+            check_return = collective_check(new_soda, test_fida)
+            if check_return:
+                return f"E117 check_return"
+
+            if commit:
+                test_fida.append(new_soda)
+
+                _global_fida = test_fida.copy()
+
+            return [cusoco]
+
+    return "E118 Invalid cusoco"
+
+
+def get_fida() -> List[dict]:
+    """Copies global_fida. Use this instead of global_fida.copy() to avoid working with global_fida directly"""
 
     return _global_fida.copy()
 
 
-def _write(fida) -> None:
-    global _global_fida
-
-    _global_fida = fida.copy()
-
-
-def _find(search_soda: dict) -> list:
-    """
-    Find all sodas that have all their key-value-pairs match those of the search_soda.
-    :return: A list of the indexes from the found sodas.
-    """
-
-    search_soda_copy = search_soda.copy()
-
-    fida = _read()
-
-    found_indexes = []
-
-    for i in range(len(fida)):
-        soda = fida[i]  # Iterate through all sodas.
-
-        if all(item in soda.items() for item in search_soda_copy.items()):  # If search_soda fits into current soda,
-            found_indexes.append(i)  # append the current soda's index to a list.
-
-    return found_indexes
-
-
-def get(search_soda: dict,
-        partial_coords: bool = False,
-        partial_contents: bool = False,
-        partial_image_paths: bool = False,
-        partial_description: bool = False, fida: List[dict] = None) -> List[dict]:
-    """
-    Get all sodas that have all their key-value-pairs match those of the search_soda.
-    :param partial_coords: If enabled, all of these: [1, 2], 4, [3], [1, 2, 3, 4, 5] would match [2, 3, 4].
-        Else only [2, 3, 4] would match [2, 3, 4].
-    :param partial_contents: Same as with partial_coords.
-    :param partial_image_paths: Same as with partial_coords.
-    :param partial_description: Same as with partial_coords.
-    :return: A list of the found sodas.
-    """
+def save_file(path: str = _save_path, fida: [list, None] = None, header: [dict, None] = None) -> [None, str]:
+    """Saves global_fida and global_header to the file at the path"""
 
     if fida is None:
-        fida_copy = _read()
-    else:
-        fida_copy = fida.copy()
+        fida = _global_fida.copy()
 
-    search_soda_copy = search_soda.copy()
+    if header is None:
+        header = _global_header.copy()
 
-    found_sodas = []
+    fida_check_return = fida_check(fida)
+    if fida_check_return:
+        raise AutodexException(f"E010 Fida: {fida_check_return}")
 
-    for soda in fida_copy:
-        try:
-            correct = True
-            for search_item in search_soda_copy.items():
-                if search_item[0] == "location":
-                    for coord in search_item[1].items():
-                        if partial_coords:
-                            a = (search_item[1][coord[0]])
-                            b = (soda["location"][coord[0]])
+    header_check_return = _header_check(header)
+    if header_check_return:
+        raise AutodexException(f"E011 Header: {header_check_return}")
 
-                            if isinstance(a, int):
-                                a = [a]
-                            if isinstance(b, int):
-                                b = [b]
+    final_header = header.copy()
+    final_header["Last saved"] = datetime.datetime.now().strftime(header["Date format"])
 
-                            # Check for intersection using sets
-                            if not (bool(set(a) & set(b))):
-                                correct = False
+    final_fida = sorted(fida.copy(), key=itemgetter("Cusoco"))
 
-                        else:
-                            if search_item[1][coord[0]] != soda["location"][coord[0]]:
-                                correct = False
+    final_data = [final_header, final_fida]
 
-                elif search_item[0] in "contents":
-                    if partial_contents:
-                        if not set(search_item[1]).issubset(soda["contents"]):
-                            correct = False
-                    else:
-                        if search_item[1] != soda["contents"]:
-                            correct = False
+    temp_save_path = path + ".tmp"
 
-                elif search_item[0] == "image_paths":
-                    if partial_image_paths:
-                        if not set(search_item[1]).issubset(soda["image_paths"]):
-                            correct = False
-                    else:
-                        if search_item[1] != soda["image_paths"]:
-                            correct = False
+    with open(temp_save_path, "w", encoding="utf-8") as temp_file:
+        json.dump(final_data, temp_file, indent=2)
 
-                elif search_item[0] == "description":
-                    if partial_description:
-                        if search_item[1] not in soda[search_item[0]]:
-                            correct = False
-                    else:
-                        if search_item[1] != soda["description"]:
-                            correct = False
+    file_check_return = _file_check(temp_save_path)
+    if file_check_return:
+        raise AutodexException(f"E012 Temp save file: {file_check_return}")
 
-                elif search_item[1] != soda[search_item[0]]:
-                    correct = False
+    shutil.move(temp_save_path, _save_path)
 
-            if correct:
-                found_sodas.append(soda)
 
-        except KeyError:
-            pass
+def load_file(path: str = _save_path) -> None:
+    """Loads contents of a file into global_header and global_fida"""
 
-    return found_sodas
+    global _global_header, _global_fida, _save_path
 
+    file_check_return = _file_check(path)
+    if file_check_return:
+        raise AutodexException(f"E013 Couldn't load file: {file_check_return}")
 
-def exists(search_soda: dict,
-           partial_coords: bool = False,
-           partial_contents: bool = False,
-           partial_image_paths: bool = False,
-           partial_description: bool = False, fida: List[dict] = None) -> bool:
-    """
-    Return True if at least one soda has all its key-value-pairs match those of the search_soda.
-    :param partial_coords: If enabled, all of these: [1, 2], 4, [3], [1, 2, 3, 4, 5] would match [2, 3, 4].
-        Else only [2, 3, 4] would match [2, 3, 4].
-    """
+    with open(path, "r", encoding="utf-8") as file:
+        data = json.load(file)
 
-    return bool(get(search_soda, partial_coords, partial_contents, partial_image_paths, partial_description, fida))
+    _global_header = data[0]
+    _global_fida = data[1]
 
-
-def _replace(search_soda: dict, replacement_soda: dict, replace_all: bool = True) -> None:
-    """
-    Replace one or more sodas that have all their key-value-pairs match those of the search_soda
-    with the replacement_soda.
-    :param replace_all: If all sodas instead of just one soda should be replaced, if multiple sodas are found.
-    """
-
-    search_soda_copy = search_soda.copy()
-    replacement_soda_copy = replacement_soda.copy()
-
-    primary_fida = _read()
-    secondary_fida = primary_fida.copy()
-
-    for i in range(len(secondary_fida)):
-        soda = secondary_fida[i]  # Iterate through all sodas.
-
-        if all(item in soda.items() for item in search_soda_copy.items()):  # If search_soda fits into current soda,
-            primary_fida[i] = replacement_soda_copy  # replace that current soda with the replacement_soda.
-
-            if not replace_all:
-                break
-
-    _check_fida(primary_fida)
-
-    _write(primary_fida)
-
-
-def check_soda(soda: dict, incomplete_soda: bool = False) -> None:
-    """
-    Check compliance of the soda with the soda guidelines.
-    Returns only if the soda is valid.
-    :param soda: The dictionary to be checked.
-    :param incomplete_soda: True if the soda doesn't have all the required keys on purpose.
-    """
-
-    soda_copy = soda.copy()
-
-    _container_types_copy = _container_types.copy()
-
-    if incomplete_soda and not len(soda_copy):
-        raise Exception("check_soda: Soda is empty.")
-
-    if not incomplete_soda:  # Check if all required keys are present.
-        for key in _template_soda:
-            if key not in soda_copy:
-                raise Exception(f"check_soda: Key \"{key}\" is missing.")
-
-    # The checks being performed:
-    # <editor-fold desc="cusoco">
-    if not incomplete_soda or "cusoco" in soda_copy:
-
-        cusoco = soda_copy["cusoco"]
-
-        if type(cusoco) is not int or cusoco < 1:
-            raise Exception(f"cusoco: {cusoco} isn't an integer.")
-    # </editor-fold>
-    # <editor-fold desc="storage_unit, container_type and location">
-    if not incomplete_soda or "storage_unit" in soda_copy or "container_type" in soda_copy or "location" in soda_copy:
-
-        storage_unit = soda_copy["storage_unit"]
-        location = soda_copy["location"]
-        container_type = soda_copy["container_type"]
-
-        if not storage_unit:
-            raise Exception(f"storage_unit: The storage unit can't be empty.")
-        elif not container_type:
-            raise Exception(f"container_type: The container type can't be empty.")
-
-        if storage_unit != "Parent" or list(location.keys()) != ["Cusoco"]:
-
-            if storage_unit not in _storage_units:  # Check that the storage unit is valid.
-                raise Exception("storage_unit: Storage unit doesn't exist.")
-
-            locations_required = _storage_units[storage_unit]  # Get dict with valid value ranges for the storage unit.
-
-            if len(locations_required) != len(
-                    location):  # Check that the amount of arguments given and required are the same.
-                raise Exception("location: Invalid amount of locations.")
-
-            for key in location:  # Iterate through each key.
-
-                value = location[key]  # Get the value of the current key.
-
-                if type(value) is not list:
-                    value = [value]
-
-                for single_value in value:
-                    if key in locations_required:  # Check that the current key is in the list of required keys.
-
-                        if locations_required[key] == math.inf and single_value:  # Check if the value is infinity,
-                            pass  # as that can't be checked using range().
-
-                        elif single_value not in locations_required[key]:  # Check that it's inside its allowed range.
-                            raise Exception(f"location: {key}: {single_value} "
-                                            f"doesn't meet its requirements.")
-
-                    else:
-                        raise Exception(f"location: The key {key} isn't in the requirements.")
-
-            if container_type not in _container_types_copy:
-                raise Exception(f"container_type: The container type \"{container_type}\" doesn't exist.")
-
-            elif storage_unit not in list(_container_types_copy[container_type].keys()):
-                raise Exception(f"container_type: Storage unit \"{storage_unit}\" "
-                                f"doesn't allow the container type \"{container_type}\".")
-
-        elif location["Cusoco"] == cusoco:
-            raise Exception(f"location: Parent cusoco can't be it's own cusoco.")
-
-        elif not exists({"cusoco": location["Cusoco"]}):
-            raise Exception(f"location: Parent cusoco {location['Cusoco']} doesn't exist.")
-    # </editor-fold>
-    # <editor-fold desc="location_size_ranges">
-    if (not incomplete_soda or
-            ("storage_unit" in soda_copy and "location" in soda_copy and "container_type" in soda_copy)):
-
-        sizes = _container_types_copy[container_type][storage_unit]
-
-        for i in list(_storage_units[storage_unit].keys()):
-
-            if i not in sizes:
-                sizes.update({i: 1})
-
-        for axis in soda_copy["location"].keys():
-            if axis in _container_types_copy[container_type][storage_unit]:
-
-                values = soda_copy["location"][axis]
-                if type(values) is not list:
-                    values = [values]
-
-                specific_value_range = range(list(set(values))[0], sizes[axis] + list(set(values))[0])
-
-                for i in range(max(len(values), len(specific_value_range))):
-                    if 0 <= i < len(values):
-                        if values[i] not in specific_value_range:
-                            raise Exception(
-                                f"location_size_ranges: {axis}: {values[i]} "
-                                f"doesn't fit into range: {list(specific_value_range)}.")
-
-                    else:
-                        raise Exception(
-                            f"location_size_ranges: {axis}: {values[i]} "
-                            f"doesn't fit into range: {list(specific_value_range)}.")
-    # </editor-fold>
-    # <editor-fold desc="name">
-    if not incomplete_soda or "name" in soda_copy:
-
-        name = soda_copy["name"]
-
-        if type(name) is not str or name.strip() == "":
-            raise Exception(f"name: The name \"{name}\" isn't a string or is empty.")
-    # </editor-fold>
-    # <editor-fold desc="description">
-    if not incomplete_soda or "description" in soda_copy:
-
-        description = soda_copy["description"]
-
-        if type(description) is not str:
-            raise Exception(f"description: The description \"{description}\" isn't a string.")
-    # </editor-fold>
-    # <editor-fold desc="image_paths">
-    if not incomplete_soda or "image_paths" in soda_copy:
-
-        image_paths = soda_copy["image_paths"]
-
-        if type(image_paths) is not list:
-            raise Exception(f"image_paths: Image paths have to be in a list.")
-
-        for path in image_paths:
-            if not os.path.isfile(path) and type(path) is not None:
-                raise Exception(f"image_paths: The image path \"{path}\" doesn't lead to a file.")
-    # </editor-fold>
-    # <editor-fold desc="contents">
-    if not incomplete_soda or "contents" in soda_copy:
-
-        contents = soda_copy["contents"]
-
-        if type(contents) is not list:
-            raise Exception(f"contents: The contents have to be in a list.")
-
-        if contents:
-            for i in range(len(contents)):
-                content = contents[i]
-                if type(content) is not str:
-                    raise Exception(f"contents: The content {i + 1} isn't a string.")
-                elif not content.strip():
-                    raise Exception(f"contents: The content number {i + 1} can't be empty.")
-    # </editor-fold>
-    # <editor-fold desc="date_created and date_changed">
-    if not incomplete_soda or "date_created" in soda_copy or "date_changed" in soda_copy:
-
-        for date in ("date_created", "date_changed"):
-            if date == "date_changed" and soda_copy[date] is None:  # date_changed can be None, date_created mustn't.
-                break
-
-            try:
-                date = datetime.strptime(soda_copy[date], _date_format)  # Turn string into a datetime.
-            except ValueError:  # If the string could not be turned into a datetime, return false.
-                raise Exception(
-                    f"date_created and date_changed: \"{date}\": \"{soda_copy[date]}\" "
-                    f"isn't a valid datetime.")
-
-            age = (date
-                   - datetime.strptime("2025-01-04T00:00:00.0Z", _date_format)  # When this was written.
-                   ).total_seconds()  # Calculate datetime difference in seconds.
-
-            difference = (datetime.now()
-                          - date
-                          ).total_seconds()  # Calculate how long ago the datetime was in seconds.
-
-            age = age / 31556952  # Turn seconds into years with 365.2425 * 24 * 60 * 60.
-            difference = difference / 31556952 + 0.01  # + 0.01 accounts for the datetime being set before this ran.
-
-            if (difference < 0  # Check that the date isn't significantly in the future,
-                    or age < 0):  # and that it doesn't occur before the original writing of this code.
-                raise Exception(f"date_created and date_changed: "
-                                f"The date \"{date}\": \"{soda_copy[date]}\" is impossible.")
-
-        if soda_copy["date_changed"] is not None:
-            if ((datetime.strptime(soda_copy["date_changed"], _date_format)
-                 - datetime.strptime(soda_copy["date_created"], _date_format)).total_seconds() < 0):
-                raise Exception("date_created and date_changed: date_changed can't be before date_created.")
-    # </editor-fold>
-
-    # Arriving here means that no check has failed, thus the soda is valid.
-
-
-def _check_fida(fida: List[dict]):
-    """
-    Check compliance of the fida with the fida guidelines,
-    and the compliance of each soda in the fida with the soda guidelines.
-    Returns only if the fida is valid.
-    :param fida: The list of dictionaries to be checked.
-    """
-
-    fida_copy = fida.copy()
-    found_duplicate = False
-
-    def generate_combinations(fida: List[dict], target_key: str) -> List[dict]:
-        result = []
-        for item in fida:
-            target_values = item[target_key]
-            keys = list(target_values.keys())
-            values = [target_values[k] if isinstance(target_values[k], list) else [target_values[k]] for k in keys]
-            for combination in itertools.product(*values):
-                new_item = {
-                    **{k: item[k] for k in item if k not in {target_key}},
-                    target_key: {keys[i]: combination[i] for i in range(len(keys))}
-                }
-                result.append(new_item)
-        return result
-
-    def find_duplicates(keys: list, fida: List[dict]):
-        duplicates_info = {}
-        for key in keys:
-            unique_values = []
-            duplicate_values = []
-            for soda in fida:
-                value = soda[key]
-                if value in unique_values and value not in duplicate_values:
-                    duplicate_values.append(value)
-                elif value:
-                    unique_values.append(value)
-            if duplicate_values:
-                duplicates_info.update({key: duplicate_values})
-        return duplicates_info
-
-    expanded_fida = generate_combinations(fida=fida_copy, target_key="location")
-
-    error_list = []
-
-    # Check for and gather the individual location duplicates in a list
-    seen_locations = []
-    for soda in expanded_fida:
-        if list(soda["location"].keys()) != ["Cusoco"]:
-            location_tuple = tuple(sorted(soda["location"].items()))
-            if location_tuple in seen_locations:
-                cusocos = [d.get("cusoco") for d in get({"location": dict(location_tuple)}, expanded_fida)]
-                error_list.append(
-                    f"Multiple sodas with matching values found: "
-                    f"key: \"location\", "
-                    f"value: {dict(location_tuple)}, "
-                    f"cusocos: {list(set(cusocos))}")
-                found_duplicate = True
-            else:
-                seen_locations.append(location_tuple)
-
-    other_duplicates_info = find_duplicates(keys=["cusoco", "name", "date_created", "date_changed"], fida=fida_copy)
-    if other_duplicates_info:
-        found_duplicate = True
-        for key, duplicate_values in other_duplicates_info.items():
-            for value in duplicate_values:
-                cusocos = [d.get("cusoco") for d in get({key: value}, fida_copy)]
-                error_list.append(
-                    f"Multiple sodas with matching values found: "
-                    f"key: \"{key}\", "
-                    f"value: {value}, "
-                    f"cusocos: {list(set(cusocos))}")
-
-    if found_duplicate:
-        error_text = "Duplicate values found:"
-        for error in error_list:
-            error_text += f"\n{error}"
-        raise Exception(error_text)
-
-    for i in range(len(fida_copy)):
-        soda = fida_copy[i]
-        try:
-            check_soda(soda)
-        except Exception as e:
-            raise Exception(f"Invalid soda in fida found: cusoco: {soda['cusoco']}, index: {i + 1}\n"
-                            f"{e}")
-
-    def find_referential_loops_containers(list_of_dicts):
-        """
-        Detects if there are any self-referential container dicts or loops of
-        references within a list of these dictionaries.
-
-        Args:
-            list_of_dicts: A list of container dictionaries, where each dictionary
-                           has a 'cusoco' (id) and potentially a 'location' that
-                           can reference another container's 'cusoco' if
-                           'storage_unit' is "Parent" and 'container_type' is "Child".
-
-        Returns:
-            A list of tuples, where each tuple represents a detected loop of 'cusoco'
-            values. Returns an empty list if no loops are found.
-        """
-        id_to_dict = {d['cusoco']: d for d in list_of_dicts}
-        num_dicts = len(list_of_dicts)
-        visited = [False] * num_dicts
-        recursion_stack = [False] * num_dicts
-        loops = set()
-
-        def _detect_cycle(index, path):
-            visited[index] = True
-            recursion_stack[index] = True
-            current_dict = list_of_dicts[index]
-            current_id = current_dict['cusoco']
-            location = current_dict.get('location')
-
-            if current_dict.get('storage_unit') == "Parent" and current_dict.get(
-                    'container_type') == "Child" and isinstance(location, dict) and "Cusoco" in location:
-                referenced_cusoco = location["Cusoco"]
-                if referenced_cusoco in id_to_dict:
-                    neighbor_dict = id_to_dict[referenced_cusoco]
-                    neighbor_index = -1
-                    try:
-                        neighbor_index = list_of_dicts.index(neighbor_dict)
-                    except ValueError:
-                        # Referenced cusoco not found in the list, not a loop
-                        pass
-
-                    if neighbor_index != -1:
-                        if recursion_stack[neighbor_index]:
-                            # Cycle detected
-                            cycle_start_index = path.index(referenced_cusoco)
-                            loop = tuple(path[cycle_start_index:] + [referenced_cusoco])
-                            loops.add(tuple(sorted(loop)))
-                        elif not visited[neighbor_index]:
-                            _detect_cycle(neighbor_index, path + [referenced_cusoco])
-
-            recursion_stack[index] = False
-
-        for i in range(num_dicts):
-            if not visited[i]:
-                _detect_cycle(i, [list_of_dicts[i]['cusoco']])
-
-        return [list(loop) for loop in loops]
-
-    recursions = find_referential_loops_containers(_read())
-    if recursions:
-        raise Exception(f"Looping references of child and parent containers found: {recursions}")
-
-    # Arriving here means that no check has failed, thus the soda is valid.
-
-
-def add(soda: dict, on_duplicates_found: Literal["raise", "ignore", "overwrite"] = "raise") -> None:
-    """
-    Add a new container.\n
-    Note that no dates are needed in the soda, as they are set here.\n
-    :param soda: The sorting data, a dictionary that includes all keys listed above.
-    :param on_duplicates_found: What to do when a container with the same cusoco is found:
-    raise: raise an exception - ignore: don't do anything - overwrite: replace the duplicate container.
-    """
-
-    soda_copy = soda.copy()
-    soda_new = _template_soda.copy()
-
-    time.sleep(0.0001)
-
-    soda_new.update(soda_copy)  # Replace the values in the soda template with the actual values.
-
-    soda_new.update({  # Replace the two dates in the soda template with the correct dates.
-        "date_created": datetime.now().strftime(_date_format),
-        "date_changed": None
-    })
-
-    cusoco = soda_new["cusoco"]
-
-    overwrite = False
-
-    if exists({"cusoco": cusoco}):  # What to do if a container with the same cusoco already exists.
-        if on_duplicates_found == "raise":
-            raise Exception(f"cusoco: The container {cusoco} already exists.")
-
-        elif on_duplicates_found == "ignore":
-            return
-
-        elif on_duplicates_found == "overwrite":
-            overwrite = True  # Set a flag for later to instead change a container instead of appending it.
-
-    check_soda(soda_new)
-
-    if overwrite:
-        change(cusoco=cusoco, soda=soda_new, overwrite_date_created=True)
-    else:
-        fida = _read()
-
-        fida.append(soda_new)
-
-        _check_fida(fida)
-
-        _write(fida)
-
-
-def change(cusoco: int, soda: dict, overwrite_date_created: bool = False) -> None:
-    """
-    Change one or more values of a certain container.
-    :param cusoco: Cusoco of the container to be changed.
-    :param soda: Dictionary of one or more key-value pairs to be changed.
-    :param overwrite_date_created: If date_created should also be changed.
-    """
-
-    time.sleep(0.0001)
-
-    soda_copy = soda.copy()
-
-    soda_copy.pop("cusoco", None)
-    soda_copy.pop("date_created", None)
-    soda_copy.pop("date_changed", None)
-
-    check_soda(soda=soda_copy, incomplete_soda=True)
-
-    containers = get({"cusoco": cusoco})
-
-    if not containers:
-        raise Exception("No containers found to change.")
-
-    container = containers[0]
-
-    if overwrite_date_created:
-        soda_copy["date_created"] = datetime.strftime(datetime.now(), _date_format)
-        soda_copy["date_changed"] = None
-    else:
-        soda_copy["date_changed"] = datetime.strftime(datetime.now(), _date_format)
-
-    container.update(soda_copy)
-
-    _replace(search_soda={"cusoco": cusoco}, replacement_soda=container, replace_all=True)
-
-
-def remove(cusoco: int) -> None:
-    """
-    Remove all containers with a certain cusoco, along with their children.
-    :param cusoco: Cusoco of the container or containers to remove.
-    """
-
-    if not exists({"cusoco": cusoco}) and not exists(
-            {"storage_unit": "Parent", "container_type": "Child", "location": {"Cusoco": cusoco}}):
-        raise Exception("No containers found to remove.")
-
-    check_soda(soda={"cusoco": cusoco}, incomplete_soda=True)
-
-    indexes = []
-
-    for i in get({"cusoco": cusoco}):
-        for x in _find(i):
-            indexes.append(x)
-
-    for i in get({"storage_unit": "Parent", "container_type": "Child", "location": {"Cusoco": cusoco}}):
-        for x in _find(i):
-            indexes.append(x)
-
-    fida = _read()
-    print(indexes)
-    for i in indexes:
-        fida[i] = None
-
-    for i in range(fida.count(None)):
-        fida.remove(None)
-
-    _check_fida(fida)
-
-    _write(fida)
-
-
-def save():
-    """
-    Actually save the file to the disc.
-    """
-
-    global_fida_copy = _read()
-
-    temp_filename = _data_path + ".tmp"
-
-    global_fida_copy = sorted(global_fida_copy, key=itemgetter("cusoco"))
-
-    with open(temp_filename, "w") as file:
-        json.dump(global_fida_copy, file, indent=4)
-
-    try:
-        with open(temp_filename, "r") as file:
-            fida = json.load(file)
-
-        _check_fida(fida)
-        for soda in fida:
-            check_soda(soda)
-
-    except Exception as e:
-        print(e)
-        os.remove(temp_filename)
-        global _global_fida
-        with open(_data_path, "r") as _fida:
-            _global_fida = json.load(_fida)
-        raise Exception(f"Temporary file corrupted, leaving {_data_path} unchanged, deleting temporary file.")
-
-    shutil.move(temp_filename, _data_path)
-
-
-def _post_code_fida_integrity_checks():
-    _check_fida(_read())
-    for i in _read():
-        check_soda(i)
-
-
-_post_code_fida_integrity_checks()
+    _save_path = path
